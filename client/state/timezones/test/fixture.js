@@ -1,4 +1,21 @@
 
+/**
+ * Internal dependencies
+ */
+import {
+	TIMEZONES_RECEIVE,
+	TIMEZONES_REQUEST,
+	TIMEZONES_REQUEST_SUCCESS,
+} from 'state/action-types';
+
+const manual_utc_offsets = [
+	{ value: 'UTC-12', label: 'UTC-12' },
+	{ value: 'UTC-11.5', label: 'UTC-11:30' },
+	{ value: 'UTC+0', label: 'UTC+0' },
+	{ value: 'UTC+13.75', label: 'UTC+13:45' },
+	{ value: 'UTC+14', label: 'UTC+14' },
+];
+
 const timezones_Africa = [
 	{ value: 'Africa/Abidjan', label: 'Abidjan' },
 	{ value: 'Africa/Accra', label: 'Accra' },
@@ -118,15 +135,24 @@ const timezones_Pacific = [
 	{ value: 'Pacific/Johnston', label: 'Johnston' },
 ];
 
+const timezones_by_continent = {
+	Africa: timezones_Africa,
+	America: timezones_America,
+	Antarctica: timezones_Antarctica,
+	Arctic: timezones_Arctic,
+	Asia: timezones_Asia,
+	Atlantic: timezones_Atlantic,
+	Australia: timezones_Australia,
+	Europe: timezones_Europe,
+	Indian: timezones_Indian,
+	Pacific: timezones_Pacific,
+};
+
 export const TIMEZONES_DATA = {
 	found: 422,
-	manual_utc_offsets: [
-		{ value: 'UTC-12', label: 'UTC-12' },
-		{ value: 'UTC-11.5', label: 'UTC-11:30' },
-		{ value: 'UTC+0', label: 'UTC+0' },
-		{ value: 'UTC+13.75', label: 'UTC+13:45' },
-		{ value: 'UTC+14', label: 'UTC+14' },
-	],
+
+	manual_utc_offsets,
+
 	timezones: [].concat(
 		timezones_Africa,
 		timezones_America,
@@ -134,18 +160,7 @@ export const TIMEZONES_DATA = {
 		timezones_Indian,
 		timezones_Pacific,
 	),
-	timezones_by_continent: {
-		Africa: timezones_Africa,
-		America: timezones_America,
-		Antarctica: timezones_Antarctica,
-		Arctic: timezones_Arctic,
-		Asia: timezones_Asia,
-		Atlantic: timezones_Atlantic,
-		Australia: timezones_Australia,
-		Europe: timezones_Europe,
-		Indian: timezones_Indian,
-		Pacific: timezones_Pacific,
-	}
+	timezones_by_continent
 };
 
 export const WP_REST_API_SUCCESS_RESPONSE = {
@@ -161,3 +176,19 @@ export const WP_REST_API = {
 	namespace: '/wpcom/v2',
 	endpoint: '/timezones'
 };
+
+// actions
+export const ACTION_TIMEZONES_RECEIVE = {
+	type: TIMEZONES_RECEIVE,
+	manual_utc_offsets,
+	timezones_by_continent
+};
+
+export const ACTION_TIMEZONES_REQUEST = {
+	type: TIMEZONES_REQUEST
+};
+
+export const ACTION_TIMEZONES_REQUEST_SUCCESS = {
+	type: TIMEZONES_REQUEST_SUCCESS
+};
+
