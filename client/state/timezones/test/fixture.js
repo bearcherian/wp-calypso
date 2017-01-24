@@ -163,6 +163,11 @@ export const TIMEZONES_DATA = {
 	timezones_by_continent
 };
 
+export const TIMEZONES_SYNC_DATA = {
+	manual_utc_offsets,
+	timezones_by_continent
+};
+
 export const WP_REST_API_SUCCESS_RESPONSE = {
 	headers: {
 		'Content-Type': 'application/json',
