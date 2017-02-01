@@ -20,7 +20,14 @@ import FormSettingExplanation from 'components/forms/form-setting-explanation';
 import Card from 'components/card';
 import Button from 'components/button';
 import SectionHeader from 'components/section-header';
-import { isJetpackSite, isJetpackModuleActive } from 'state/sites/selectors';
+import {
+	isJetpackModuleActive,
+	isJetpackSite,
+	siteSupportsJetpackSettingsUi
+} from 'state/sites/selectors';
+import { getSelectedSiteId } from 'state/ui/selectors';
+import Subscriptions from './subscriptions';
+import QueryJetpackModules from 'components/data/query-jetpack-modules';
 
 class SiteSettingsFormDiscussion extends Component {
 	handleCommentOrder = () => {
@@ -443,9 +450,19 @@ class SiteSettingsFormDiscussion extends Component {
 	}
 
 	render() {
-		const { handleSubmitForm, translate } = this.props;
+		const {
+			fields,
+			handleSubmitForm,
+			handleToggle,
+			siteId,
+			isRequestingSettings,
+			isSavingSettings,
+			isJetpack,
+			jetpackSettingsUISupported,
+			translate
+		} = this.props;
 		return (
-			<form id="site-settings" onSubmit={ handleSubmitForm } onChange={ this.props.markChanged }>
+			<form id="site-settings" onSubmit={ handleSubmitForm }>
 				{ this.renderSectionHeader( translate( 'Default Article Settings' ) ) }
 				<Card className="site-settings__discussion-settings">
 					{ this.defaultArticleSettings() }
@@ -463,18 +480,40 @@ class SiteSettingsFormDiscussion extends Component {
 					<hr />
 					{ this.commentBlacklistSettings() }
 				</Card>
+
+				{
+					isJetpack && jetpackSettingsUISupported && (
+						<div>
+							<QueryJetpackModules siteId={ siteId } />
+
+							{ this.renderSectionHeader( translate( 'Subscriptions' ) ) }
+
+							<Subscriptions
+								onSubmitForm={ handleSubmitForm }
+								handleToggle={ handleToggle }
+								isSavingSettings={ isSavingSettings }
+								isRequestingSettings={ isRequestingSettings }
+								fields={ fields }
+							/>
+						</div>
+					)
+				}
 			</form>
 		);
 	}
 }
 
 const connectComponent = connect(
-	( state, { siteId } ) => {
+	( state ) => {
+		const siteId = getSelectedSiteId( state );
 		const isJetpack = isJetpackSite( state, siteId );
+		const jetpackSettingsUISupported = siteSupportsJetpackSettingsUi( state, siteId );
 		const isLikesModuleActive = isJetpackModuleActive( state, siteId, 'likes' );
 
 		return {
+			siteId,
 			isJetpack,
+			jetpackSettingsUISupported,
 			isLikesModuleActive,
 		};
 	}
@@ -496,6 +535,7 @@ const getFormSettings = partialRight( pick, [
 	'comment_order',
 	'comments_notify',
 	'moderation_notify',
+	'likes',
 	'social_notifications_like',
 	'social_notifications_reblog',
 	'social_notifications_subscribe',
@@ -507,6 +547,9 @@ const getFormSettings = partialRight( pick, [
 	'admin_url',
 	'wpcom_publish_comments_with_markdown',
 	'markdown_supported',
+	'subscriptions',
+	'stb_enabled',
+	'stc_enabled',
 ] );
 
 export default flowRight(

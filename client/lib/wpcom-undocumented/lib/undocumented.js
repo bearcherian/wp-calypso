@@ -1311,11 +1311,6 @@ Undocumented.prototype.unfollowReaderFeed = function( query, fn ) {
 	return this.wpcom.req.post( '/read/following/mine/delete', query, {}, fn );
 };
 
-Undocumented.prototype.readTeams = function( fn ) {
-	debug( '/read/teams' );
-	return this.wpcom.req.get( '/read/teams', { apiVersion: '1.2' }, fn );
-};
-
 Undocumented.prototype.readSite = function( query, fn ) {
 	var params = omit( query, 'site' );
 	debug( '/read/sites/:site' );
@@ -2015,7 +2010,7 @@ Undocumented.prototype.cancelAndRefundPurchase = function( purchaseId, data, fn 
 	}, fn );
 };
 
-Undocumented.prototype.cancelPrivateRegistration = function( purchaseId, fn ) {
+Undocumented.prototype.cancelPrivacyProtection = function( purchaseId, fn ) {
 	debug( 'upgrades/{purchaseId}/cancel-privacy-protection' );
 
 	return this.wpcom.req.post( {

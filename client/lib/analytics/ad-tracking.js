@@ -9,6 +9,7 @@ import debugFactory from 'debug';
 const debug = debugFactory( 'calypso:ad-tracking' );
 import { clone, cloneDeep } from 'lodash';
 import cookie from 'cookie';
+import { v4 as uuid } from 'uuid';
 
 /**
  * Internal dependencies
@@ -42,6 +43,7 @@ const FACEBOOK_TRACKING_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 	YAHOO_TRACKING_SCRIPT_URL = 'https://s.yimg.com/wi/ytc.js',
 	TWITTER_TRACKING_SCRIPT_URL = 'https://static.ads-twitter.com/uwt.js',
 	DCM_FLOODLIGHT_IFRAME_URL = 'https://6355556.fls.doubleclick.net/activityi',
+	LINKED_IN_SCRIPT_URL = 'https://snap.licdn.com/li.lms-analytics/insight.min.js',
 	TRACKING_IDS = {
 		bingInit: '4074038',
 		facebookInit: '823166884443641',
@@ -53,8 +55,13 @@ const FACEBOOK_TRACKING_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 		yahooProjectId: '10000',
 		yahooPixelId: '10014088',
 		twitterPixelId: 'nvzbs',
-		dcmFloodlightAdvertiserId: '6355556'
+		dcmFloodlightAdvertiserId: '6355556',
+		linkedInPartnerId: '36622'
 	},
+
+	// This name is something we created to store a session id for DCM Floodlight session tracking
+	DCM_FLOODLIGHT_SESSION_COOKIE_NAME = 'dcmsid',
+	DCM_FLOODLIGHT_SESSION_LENGTH_IN_SECONDS = 1800,
 
 	// For converting other currencies into USD for tracking purposes
 	EXCHANGE_RATES = {
@@ -89,6 +96,10 @@ if ( ! window._qevents ) {
 
 if ( ! window.twq ) {
 	setUpTwitterGlobal();
+}
+
+if ( ! window._linkedin_data_partner_id ) {
+	window._linkedin_data_partner_id = TRACKING_IDS.linkedInPartnerId;
 }
 
 /**
@@ -150,6 +161,9 @@ function loadTrackingScripts( callback ) {
 		},
 		function( onComplete ) {
 			loadScript.loadScript( TWITTER_TRACKING_SCRIPT_URL, onComplete );
+		},
+		function( onComplete ) {
+			loadScript.loadScript( LINKED_IN_SCRIPT_URL, onComplete );
 		}
 	], function( errors ) {
 		if ( ! some( errors ) ) {
@@ -492,7 +506,6 @@ function recordOrderInFloodlight( cart, orderId ) {
 	debug( 'recordOrderInFloodlight: Record purchase' );
 
 	const params = {
-		src: TRACKING_IDS.dcmFloodlightAdvertiserId,
 		type: 'wpsal0',
 		cat: 'wpsale',
 		qty: 1,
@@ -518,10 +531,8 @@ function recordAliasInFloodlight() {
 	debug( 'recordAliasInFloodlight: Aliasing anonymous user id with WordPress.com user id' );
 
 	const params = {
-		src: TRACKING_IDS.dcmFloodlightAdvertiserId,
 		type: 'wordp0',
-		cat: 'alias0',
-		ord: floodlightCacheBuster()
+		cat: 'alias0'
 	};
 
 	recordParamsInFloodlight( params );
@@ -540,10 +551,8 @@ function recordSignupStartInFloodlight() {
 	debug( 'DCM Floodlight: Recording sign up start' );
 
 	const params = {
-		src: TRACKING_IDS.dcmFloodlightAdvertiserId,
 		type: 'wordp0',
-		cat: 'pre-p0',
-		ord: floodlightCacheBuster()
+		cat: 'pre-p0'
 	};
 
 	recordParamsInFloodlight( params );
@@ -562,13 +571,67 @@ function recordSignupCompletionInFloodlight() {
 	debug( 'DCM Floodlight: Recording sign up completion' );
 
 	const params = {
-		src: TRACKING_IDS.dcmFloodlightAdvertiserId,
 		type: 'wordp0',
-		cat: 'signu0',
-		ord: floodlightCacheBuster()
+		cat: 'signu0'
 	};
 
 	recordParamsInFloodlight( params );
+}
+
+/**
+ * Track a page view in DCM Floodlight
+ *
+ * @param {String} urlPath - The URL path
+ * @returns {void}
+ */
+function recordPageViewInFloodlight( urlPath ) {
+	if ( ! config.isEnabled( 'ad-tracking' ) ) {
+		return;
+	}
+
+	const sessionId = floodlightSessionId();
+
+	debug( 'Floodlight: Recording page view for session ' + sessionId );
+
+	// Set or bump the cookie's expiration date to maintain the session
+	document.cookie = cookie.serialize( DCM_FLOODLIGHT_SESSION_COOKIE_NAME, sessionId, {
+		maxAge: DCM_FLOODLIGHT_SESSION_LENGTH_IN_SECONDS
+	} );
+
+	recordParamsInFloodlight( {
+		type: 'wordp0',
+		cat: 'wpvisit',
+		u6: urlPath,
+		u7: sessionId,
+		ord: sessionId
+	} );
+
+	recordParamsInFloodlight( {
+		type: 'wordp0',
+		cat: 'wppv',
+		u6: urlPath,
+		u7: sessionId
+	} );
+}
+
+/**
+ * Returns the DCM Floodlight session id, generating a new one if there's not already one
+ *
+ * @returns {String} The session id
+ */
+function floodlightSessionId() {
+	const cookies = cookie.parse( document.cookie );
+
+	const existingSessionId = cookies[ DCM_FLOODLIGHT_SESSION_COOKIE_NAME ];
+	if ( existingSessionId ) {
+		debug( 'Floodlight: Existing session: ' + existingSessionId );
+		return existingSessionId;
+	}
+
+	// Generate a 32-byte random session id
+	const newSessionId = uuid().replace( new RegExp( '-', 'g' ), '' );
+	debug( 'Floodlight: New session: ' + newSessionId );
+	return newSessionId;
 }
 
 /**
@@ -615,6 +678,14 @@ function recordParamsInFloodlight( params ) {
 
 	// Add in the u4 and u5 params
 	params = assign( params, floodlightUserParams() );
+
+	// As well as the advertiser id
+	params.src = TRACKING_IDS.dcmFloodlightAdvertiserId;
+
+	// The ord is only set for purchases; the rest of the time it should be a random string
+	if ( params.ord === undefined ) {
+		params.ord = floodlightCacheBuster();
+	}
 
 	debug( 'recordParamsInFloodlight:', params );
 
@@ -859,6 +930,7 @@ module.exports = {
 	},
 
 	recordAliasInFloodlight,
+	recordPageViewInFloodlight,
 	retargetViewPlans,
 	recordAddToCart,
 	recordViewCheckout,

@@ -16,7 +16,7 @@ import Followers from '../stats-followers';
 import Reach from '../stats-reach';
 import PostingActivity from '../post-trends';
 import TodaysStats from '../stats-site-overview';
-import StatsConnectedModule from '../stats-module/connected-list';
+import StatsModule from '../stats-module';
 import statsStrings from '../stats-strings';
 import MostPopular from 'my-sites/stats/most-popular';
 import LatestPostSummary from '../post-performance';
@@ -28,29 +28,23 @@ export default React.createClass( {
 	displayName: 'StatsInsights',
 
 	propTypes: {
-		commentFollowersList: PropTypes.object.isRequired,
 		commentsList: PropTypes.object.isRequired,
-		emailFollowersList: PropTypes.object.isRequired,
 		followList: PropTypes.object.isRequired,
 		site: React.PropTypes.oneOfType( [
 			React.PropTypes.bool,
 			React.PropTypes.object
 		] ),
 		summaryDate: PropTypes.string,
-		wpcomFollowersList: PropTypes.object
 	},
 
 	render() {
 		const {
-			commentFollowersList,
 			commentsList,
-			emailFollowersList,
 			followList,
 			site,
-			wpcomFollowersList } = this.props;
+		} = this.props;
 
 		const moduleStrings = statsStrings();
-
 
 		let momentSiteZone = i18n.moment();
 
@@ -64,7 +58,7 @@ export default React.createClass( {
 		let tagsList;
 		if ( ! site.jetpack ) {
 			tagsList = (
-				<StatsConnectedModule
+				<StatsModule
 					path="tags-categories"
 					moduleStrings={ moduleStrings.tags }
 					statType="statsTags" />
@@ -97,20 +91,17 @@ export default React.createClass( {
 							<div className="stats__module-column">
 								<Comments
 									path={ 'comments' }
-									site={ site }
 									commentsList={ commentsList }
 									followList={ followList }
-									commentFollowersList={ commentFollowersList } />
+								/>
 								{ tagsList }
 							</div>
 							<div className="stats__module-column">
 								<Followers
 									path={ 'followers' }
 									site={ site }
-									wpcomFollowersList={ wpcomFollowersList }
-									emailFollowersList={ emailFollowersList }
 									followList={ followList } />
-								<StatsConnectedModule
+								<StatsModule
 									path="publicize"
 									moduleStrings={ moduleStrings.publicize }
 									statType="statsPublicize" />

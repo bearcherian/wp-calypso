@@ -6,12 +6,12 @@ import classNames from 'classnames';
 import { localize } from 'i18n-calypso';
 import { connect } from 'react-redux';
 import { flowRight } from 'lodash';
+import Gridicon from 'gridicons';
 
 /**
  * Internal dependencies
  */
 import Card from 'components/card';
-import Gridicon from 'components/gridicon';
 import StatsModulePlaceholder from '../stats-module/placeholder';
 import StatsModuleContent from '../stats-module/content-text';
 import QueryPostStats from 'components/data/query-post-stats';
@@ -37,7 +37,7 @@ const StatsPostDetailWeeks = ( props ) => {
 	};
 
 	if ( stats && stats.weeks ) {
-		const publishDate = post.post_date ? moment( post.post_date ) : null;
+		const publishDate = post && post.post_date ? moment( post.post_date ) : null;
 		highest = stats.highest_week_average;
 		tableHeader = (
 			<thead>

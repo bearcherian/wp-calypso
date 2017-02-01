@@ -141,12 +141,6 @@ module.exports = {
 			? site.slug : route.getSiteFragment( context.path );
 
 		const commentsList = new StatsList( { siteID: siteId, statType: 'statsComments', domain: siteDomain } );
-		const wpcomFollowersList = new StatsList( {
-			siteID: siteId, statType: 'statsFollowers', type: 'wpcom', domain: siteDomain, max: 7 } );
-		const emailFollowersList = new StatsList( {
-			siteID: siteId, statType: 'statsFollowers', type: 'email', domain: siteDomain, max: 7 } );
-		const commentFollowersList = new StatsList( {
-			siteID: siteId, statType: 'statsCommentFollowers', domain: siteDomain, max: 7 } );
 
 		analytics.pageView.record( basePath, analyticsPageTitle + ' > Insights' );
 
@@ -155,9 +149,6 @@ module.exports = {
 				site: site,
 				followList: followList,
 				commentsList: commentsList,
-				wpcomFollowersList: wpcomFollowersList,
-				emailFollowersList: emailFollowersList,
-				commentFollowersList: commentFollowersList,
 				summaryDate: summaryDate
 			} ),
 			document.getElementById( 'primary' ),
@@ -211,7 +202,6 @@ module.exports = {
 		const siteFragment = route.getSiteFragment( context.path );
 		const queryOptions = context.query;
 		const SiteStatsComponent = require( 'my-sites/stats/site' );
-		const StatsList = require( 'lib/stats/stats-list' );
 		const filters = getSiteFilters.bind( null, siteId );
 		let date;
 		const charts = function() {
@@ -223,18 +213,13 @@ module.exports = {
 				{ attr: 'comments', gridicon: 'comment', label: i18n.translate( 'Comments', { context: 'noun' } ) }
 			];
 		};
-		let chartDate;
 		let chartTab;
-		let visitsListFields;
-		let chartEndDate;
 		let period;
-		let chartPeriod;
 		let siteOffset = 0;
 		let momentSiteZone = i18n.moment();
 		let numPeriodAgo = 0;
 		const basePath = route.sectionify( context.path );
 		let baseAnalyticsPath;
-		let chartQuantity = 10;
 		let siteComponent;
 
 		// FIXME: Auto-converted from the Flux setTitle action. Please use <DocumentHead> instead.
@@ -272,7 +257,6 @@ module.exports = {
 				siteOffset = currentSite.options.gmt_offset;
 			}
 			momentSiteZone = i18n.moment().utcOffset( siteOffset );
-			chartDate = rangeOfPeriod( activeFilter.period, momentSiteZone.clone().locale( 'en' ) ).endOf;
 			if ( queryOptions.startDate && i18n.moment( queryOptions.startDate ).isValid ) {
 				date = i18n.moment( queryOptions.startDate ).locale( 'en' );
 				numPeriodAgo = getNumPeriodAgo( momentSiteZone, date, activeFilter.period );
@@ -296,57 +280,21 @@ module.exports = {
 			analytics.pageView.record( baseAnalyticsPath, analyticsPageTitle + ' > ' + titlecase( activeFilter.period ) );
 
 			period = rangeOfPeriod( activeFilter.period, date );
-			chartPeriod = rangeOfPeriod( activeFilter.period, chartDate );
-			chartEndDate = chartPeriod.endOf.format( 'YYYY-MM-DD' );
 
 			chartTab = queryOptions.tab || 'views';
-			visitsListFields = chartTab;
-			// If we are on the default Tab, grab visitors too
-			if ( 'views' === visitsListFields ) {
-				visitsListFields = 'views,visitors';
-			}
-
-			switch ( activeFilter.period ) {
-				case 'day':
-					chartQuantity = 30;
-					break;
-				case 'month':
-					chartQuantity = 12;
-					break;
-				case 'week':
-					chartQuantity = 13;
-					break;
-				case 'year':
-					break;
-				default:
-					chartQuantity = 10;
-					break;
-			}
 
 			const siteDomain = ( currentSite && ( typeof currentSite.slug !== 'undefined' ) )
 					? currentSite.slug : siteFragment;
-
-			const activeTabVisitsList = new StatsList( {
-				siteID: siteId, statType: 'statsVisits', unit: activeFilter.period,
-				quantity: chartQuantity, date: chartEndDate, stat_fields: visitsListFields, domain: siteDomain } );
-			const visitsList = new StatsList( {
-				siteID: siteId, statType: 'statsVisits', unit: activeFilter.period,
-				quantity: chartQuantity, date: chartEndDate,
-				stat_fields: 'views,visitors,likes,comments,post_titles', domain: siteDomain } );
 
 			siteComponent = SiteStatsComponent;
 			const siteComponentChildren = {
 				date,
 				charts,
-				chartDate,
 				chartTab,
 				context,
 				sites,
-				activeTabVisitsList,
-				visitsList,
 				siteId,
 				period,
-				chartPeriod,
 				slug: siteDomain,
 				path: context.pathname,
 			};
@@ -508,10 +456,8 @@ module.exports = {
 		let siteId = context.params.site_id;
 		const postId = parseInt( context.params.post_id, 10 );
 		const StatsPostComponent = require( 'my-sites/stats/stats-post-detail' );
-		const StatsList = require( 'lib/stats/stats-list' );
 		const pathParts = context.path.split( '/' );
 		const postOrPage = pathParts[ 2 ] === 'post' ? 'post' : 'page';
-		let postViewsList;
 
 		let site = sites.getSite( siteId );
 		if ( ! site ) {
@@ -529,22 +475,14 @@ module.exports = {
 				window.location = '/stats';
 			}
 		} else {
-			const siteDomain = ( site && ( typeof site.slug !== 'undefined' ) )
-				? site.slug : route.getSiteFragment( context.path );
-
-			postViewsList = new StatsList( { statType: 'statsPostViews', siteID: siteId, post: postId, domain: siteDomain } );
-
 			analytics.pageView.record( '/stats/' + postOrPage + '/:post_id/:site',
 				analyticsPageTitle + ' > Single ' + titlecase( postOrPage ) );
 
 			renderWithReduxStore(
 				React.createElement( StatsPostComponent, {
-					siteId: siteId,
 					postId: postId,
-					sites: sites,
 					context: context,
 					path: context.path,
-					postViewsList: postViewsList
 				} ),
 				document.getElementById( 'primary' ),
 				context.store
@@ -556,12 +494,10 @@ module.exports = {
 		let siteId = context.params.site_id;
 		const FollowList = require( 'lib/follow-list' );
 		const FollowsComponent = require( 'my-sites/stats/follows' );
-		const StatsList = require( 'lib/stats/stats-list' );
 		const validFollowTypes = [ 'wpcom', 'email', 'comment' ];
 		const followType = context.params.follow_type;
 		let pageNum = context.params.page_num;
 		const followList = new FollowList();
-		let followersList;
 		const basePath = route.sectionify( context.path );
 
 		let site = sites.getSite( siteId );
@@ -591,19 +527,6 @@ module.exports = {
 				pageNum = 1;
 			}
 
-			switch ( followType ) {
-				case 'comment':
-					followersList = new StatsList( {
-						siteID: siteId, statType: 'statsCommentFollowers', domain: siteDomain, max: 20, page: pageNum } );
-					break;
-
-				case 'email':
-				case 'wpcom':
-					followersList = new StatsList( {
-						siteID: siteId, statType: 'statsFollowers', domain: siteDomain, max: 20, page: pageNum, type: followType } );
-					break;
-			}
-
 			analytics.pageView.record(
 				basePath.replace( '/' + pageNum, '' ),
 				analyticsPageTitle + ' > Followers > ' + titlecase( followType )
@@ -617,7 +540,6 @@ module.exports = {
 					page: pageNum,
 					perPage: 20,
 					total: 10,
-					followersList: followersList,
 					followType: followType,
 					followList: followList,
 					domain: siteDomain

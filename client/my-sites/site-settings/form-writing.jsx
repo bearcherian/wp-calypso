@@ -30,6 +30,7 @@ import { getSelectedSiteId } from 'state/ui/selectors';
 import { requestPostTypes } from 'state/post-types/actions';
 import CustomPostTypeFieldset from './custom-post-types-fieldset';
 import ThemeEnhancements from './theme-enhancements';
+import PublishingTools from './publishing-tools';
 import QueryJetpackModules from 'components/data/query-jetpack-modules';
 
 class SiteSettingsFormWriting extends Component {
@@ -49,7 +50,6 @@ class SiteSettingsFormWriting extends Component {
 
 	setCustomPostTypeSetting = ( revision ) => {
 		this.props.updateFields( revision );
-		this.props.markChanged();
 	}
 
 	submitFormAndActivateCustomContentModule = ( event ) => {
@@ -105,7 +105,6 @@ class SiteSettingsFormWriting extends Component {
 			isSavingSettings,
 			jetpackVersionSupportsCustomTypes,
 			onChangeField,
-			markChanged,
 			siteId,
 			trackEvent,
 			translate
@@ -115,7 +114,6 @@ class SiteSettingsFormWriting extends Component {
 			<form
 				id="site-settings"
 				onSubmit={ this.submitFormAndActivateCustomContentModule }
-				onChange={ markChanged }
 				className="site-settings__general-settings"
 			>
 				{ config.isEnabled( 'manage/site-settings/categories' ) &&
@@ -209,18 +207,28 @@ class SiteSettingsFormWriting extends Component {
 								isSavingSettings={ isSavingSettings }
 								isRequestingSettings={ isRequestingSettings }
 								fields={ fields }
+							/>
+
+							{ config.isEnabled( 'press-this' ) &&
+								<PublishingTools
+									onSubmitForm={ this.submitFormAndActivateCustomContentModule }
+									isSavingSettings={ isSavingSettings }
+									isRequestingSettings={ isRequestingSettings }
+									fields={ fields }
 								/>
+							}
 						</div>
 					)
 				}
 
-				{ config.isEnabled( 'press-this' ) && (
+				{ config.isEnabled( 'press-this' ) && ! ( this.props.isJetpackSite || this.props.jetpackSettingsUISupported ) && (
 					<div>
 						{
 							this.renderSectionHeader( translate( 'Press This', {
 								context: 'name of browser bookmarklet tool'
 							} ), false )
 						}
+
 						<PressThis />
 					</div>
 				) }
@@ -252,11 +260,14 @@ const getFormSettings = partialRight( pick, [
 	'markdown_supported',
 	'jetpack_testimonial',
 	'jetpack_portfolio',
+	'infinite-scroll',
 	'infinite_scroll',
 	'infinite_scroll_google_analytics',
+	'minileven',
 	'wp_mobile_excerpt',
 	'wp_mobile_featured_images',
-	'wp_mobile_app_promos'
+	'wp_mobile_app_promos',
+	'post_by_email_address'
 ] );
 
 export default flowRight(

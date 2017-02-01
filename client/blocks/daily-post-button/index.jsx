@@ -6,6 +6,7 @@ import classnames from 'classnames';
 import page from 'page';
 import qs from 'qs';
 import { get, defer } from 'lodash';
+import Gridicon from 'gridicons';
 
 /**
  * Internal Dependencies
@@ -14,7 +15,6 @@ import { translate } from 'i18n-calypso';
 import { preload } from 'sections-preload';
 import SitesPopover from 'components/sites-popover';
 import Button from 'components/button';
-import Gridicon from 'components/gridicon';
 import { markSeen as markPostSeen } from 'lib/feed-post-store/actions';
 
 import getSitesList from 'lib/sites-list';
@@ -58,6 +58,7 @@ class DailyPostButton extends React.Component {
 
 	static propTypes = {
 		post: React.PropTypes.object.isRequired,
+		site: React.PropTypes.object.isRequired,
 		position: React.PropTypes.string,
 		tagName: React.PropTypes.string,
 	}
@@ -96,7 +97,7 @@ class DailyPostButton extends React.Component {
 		recordGaEvent( 'Clicked on Daily Post challenge' );
 		recordTrackForPost( 'calypso_reader_daily_post_challenge_site_picked', this.props.post );
 
-		markPostSeen( this.props.post );
+		markPostSeen( this.props.post, this.props.site );
 
 		page( `/post/${ siteSlug }?${ qs.stringify( pingbackAttributes ) }` );
 		return true;

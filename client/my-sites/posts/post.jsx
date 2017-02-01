@@ -4,12 +4,12 @@
 import React from 'react';
 import ReactCSSTransitionGroup from 'react-addons-css-transition-group';
 import classNames from 'classnames';
+import Gridicon from 'gridicons';
 
 /**
  * Internal dependencies
  */
 import Card from 'components/card';
-import Gridicon from 'components/gridicon';
 import PostRelativeTimeStatus from 'my-sites/post-relative-time-status';
 import PostControls from './post-controls';
 import PostHeader from './post-header';
@@ -293,13 +293,11 @@ module.exports = React.createClass( {
 			if ( showLikes ) {
 				likeMeta = (
 					<a
-						href={ post.URL }
+						href={ `/stats/post/${ postId }/${ site.slug }` }
 						className={ classNames( {
 							post__likes: true,
 							'is-empty': ! likeCountDisplay
 						} ) }
-						target="_blank"
-						rel="noopener noreferrer"
 						title={ likeTitle }
 						onClick={ this.analyticsEvents.likeIconClick }
 					>
