@@ -79,11 +79,11 @@ export const ThemesList = React.createClass( {
 	renderTheme( theme, index ) {
 		return <Theme
 			key={ 'theme-' + theme.id }
-			buttonContents={ this.props.getButtonOptions( theme ) }
-			screenshotClickUrl={ this.props.getScreenshotUrl && this.props.getScreenshotUrl( theme ) }
+			buttonContents={ this.props.getButtonOptions( theme.id ) }
+			screenshotClickUrl={ this.props.getScreenshotUrl && this.props.getScreenshotUrl( theme.id ) }
 			onScreenshotClick={ this.props.onScreenshotClick }
 			onMoreButtonClick={ this.props.onMoreButtonClick }
-			actionLabel={ this.props.getActionLabel( theme ) }
+			actionLabel={ this.props.getActionLabel( theme.id ) }
 			index={ index }
 			theme={ theme }
 			active={ this.props.isActive( theme.id ) }
@@ -99,7 +99,7 @@ export const ThemesList = React.createClass( {
 
 	// Invisible trailing items keep all elements same width in flexbox grid.
 	renderTrailingItems() {
-		const NUM_SPACERS = 8; // gives enough spacers for a theoretical 9 column layout
+		const NUM_SPACERS = 11; // gives enough spacers for a theoretical 12 column layout
 		return times( NUM_SPACERS, function( i ) {
 			return <div className="themes-list--spacer" key={ 'themes-list--spacer-' + i } />;
 		} );

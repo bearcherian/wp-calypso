@@ -13,7 +13,6 @@ import {
 
 import { updateEligibility } from 'state/automated-transfer/actions';
 import {
-	transferStates,
 	eligibilityHolds,
 } from 'state/automated-transfer/constants';
 
@@ -25,14 +24,18 @@ import {
  * in the code directly dealing with the API.
  */
 const statusMapping = {
-	multiple_users: eligibilityHolds.MULTIPLE_USERS,
-	no_vip_sites: eligibilityHolds.NO_VIP_SITES,
+	transfer_already_exists: eligibilityHolds.TRANSFER_ALREADY_EXISTS,
 	no_business_plan: eligibilityHolds.NO_BUSINESS_PLAN,
-	no_wpcom_nameservers: eligibilityHolds.NO_WPCOM_NAMESERVERS,
-	not_using_custom_domain: eligibilityHolds.NOT_USING_CUSTOM_DOMAIN,
-	non_admin_user: eligibilityHolds.NON_ADMIN_USER,
-	site_graylisted: eligibilityHolds.SITE_GRAYLISTED,
+	no_jetpack_sites: eligibilityHolds.NO_JETPACK_SITES,
+	no_vip_sites: eligibilityHolds.NO_VIP_SITES,
 	site_private: eligibilityHolds.SITE_PRIVATE,
+	site_graylisted: eligibilityHolds.SITE_GRAYLISTED,
+	non_admin_user: eligibilityHolds.NON_ADMIN_USER,
+	not_using_custom_domain: eligibilityHolds.NOT_USING_CUSTOM_DOMAIN,
+	not_domain_owner: eligibilityHolds.NOT_DOMAIN_OWNER,
+	no_wpcom_nameservers: eligibilityHolds.NO_WPCOM_NAMESERVERS,
+	not_resolving_to_wpcom: eligibilityHolds.NOT_RESOLVING_TO_WPCOM,
+	no_ssl_certificate: eligibilityHolds.NO_SSL_CERTIFICATE,
 };
 
 /**
@@ -67,7 +70,6 @@ const eligibilityWarningsFromApi = ( { warnings = {} } ) =>
  */
 const fromApi = data => ( {
 	lastUpdate: Date.now(),
-	status: transferStates.INQUIRING,
 	eligibilityHolds: eligibilityHoldsFromApi( data ),
 	eligibilityWarnings: eligibilityWarningsFromApi( data ),
 } );

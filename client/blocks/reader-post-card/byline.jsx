@@ -34,7 +34,6 @@ class PostByline extends React.Component {
 
 	static defaultProps = {
 		isDiscoverPost: false,
-		showSiteName: true
 	}
 
 	recordTagClick = () => {
@@ -70,7 +69,8 @@ class PostByline extends React.Component {
 					feedIcon={ feedIcon }
 					author={ post.author }
 					preferGravatar={ true }
-					siteUrl={ streamUrl } />
+					siteUrl={ streamUrl }
+					siteIconSize={ 32 } />
 				<div className="reader-post-card__byline-details">
 					<div className="reader-post-card__byline-author-site">
 						{ shouldDisplayAuthor &&

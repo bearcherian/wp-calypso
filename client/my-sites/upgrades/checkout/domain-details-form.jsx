@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import classNames from 'classnames';
-import { map, camelCase, kebabCase, head, omit } from 'lodash';
+import { camelCase, head, kebabCase, map, omit, reduce } from 'lodash';
 
 /**
  * Internal dependencies
@@ -15,12 +15,11 @@ import { cartItems } from 'lib/cart-values';
 import { forDomainRegistrations as countriesListForDomainRegistrations } from 'lib/countries-list';
 import analytics from 'lib/analytics';
 import formState from 'lib/form-state';
-import { addPrivacyToAllDomains, removePrivacyFromAllDomains, setDomainDetails } from 'lib/upgrades/actions';
+import { addPrivacyToAllDomains, removePrivacyFromAllDomains, setDomainDetails, addGoogleAppsRegistrationData } from 'lib/upgrades/actions';
 import FormButton from 'components/forms/form-button';
 import { countries } from 'components/phone-input/data';
 import { toIcannFormat } from 'components/phone-input/phone-number';
 import FormPhoneMediaInput from 'components/forms/form-phone-media-input';
-import { abtest } from 'lib/abtest';
 
 // Cannot convert to ES6 import
 const wpcom = require( 'lib/wp' ).undocumented(),
@@ -85,17 +84,22 @@ export default React.createClass( {
 	},
 
 	validate( fieldValues, onComplete ) {
-		const domainNames = map( cartItems.getDomainRegistrations( this.props.cart ), 'meta' );
-
-		const allFieldValues = Object.assign( {}, fieldValues );
-		if ( abtest( 'domainContactNewPhoneInput' ) === 'enabled' ) {
-			allFieldValues.phone = toIcannFormat( allFieldValues.phone, countries[ this.state.phoneCountryCode ] );
+		if ( this.needsOnlyGoogleAppsDetails() ) {
+			wpcom.validateGoogleAppsContactInformation( fieldValues, this.generateValidationHandler( onComplete ) );
+			return;
 		}
 
-		wpcom.validateDomainContactInformation( allFieldValues, domainNames, ( error, data ) => {
+		const allFieldValues = Object.assign( {}, fieldValues );
+		allFieldValues.phone = toIcannFormat( allFieldValues.phone, countries[ this.state.phoneCountryCode ] );
+		const domainNames = map( cartItems.getDomainRegistrations( this.props.cart ), 'meta' );
+		wpcom.validateDomainContactInformation( allFieldValues, domainNames, this.generateValidationHandler( onComplete ) );
+	},
+
+	generateValidationHandler( onComplete ) {
+		return ( error, data ) => {
 			const messages = data && data.messages || {};
 			onComplete( error, messages );
-		} );
+		};
 	},
 
 	setFormState( form ) {
@@ -108,6 +112,10 @@ export default React.createClass( {
 		}
 
 		this.setState( { form } );
+	},
+
+	needsOnlyGoogleAppsDetails() {
+		return cartItems.hasGoogleApps( this.props.cart ) && ! cartItems.hasDomainRegistration( this.props.cart );
 	},
 
 	handleFormControllerError( error ) {
@@ -123,12 +131,10 @@ export default React.createClass( {
 				hideError: true
 			} );
 
-			if ( abtest( 'domainContactNewPhoneInput' ) === 'enabled' ) {
-				if ( ! formState.getFieldValue( this.state.form, 'phone' ) ) {
-					this.setState( {
-						phoneCountryCode: event.target.value
-					} );
-				}
+			if ( ! formState.getFieldValue( this.state.form, 'phone' ) ) {
+				this.setState( {
+					phoneCountryCode: event.target.value
+				} );
 			}
 		}
 
@@ -203,91 +209,121 @@ export default React.createClass( {
 		);
 	},
 
-	renderPhoneField() {
-		const label = this.translate( 'Phone', { textOnly: true } );
-
-		if ( abtest( 'domainContactNewPhoneInput' ) === 'enabled' ) {
-			return (
-				<FormPhoneMediaInput
-					label={ label }
-					countriesList={ countriesList }
-					countryCode={ this.state.phoneCountryCode }
-					onChange={ this.handlePhoneChange }
-					{ ...omit( this.getFieldProps( 'phone' ), 'onChange' ) } />
-			);
-		}
-		return (
-			<Input
-				label={ label }
-				placeholder={ this.translate(
-					'e.g. +1.5558675309',
-					{
-						context: 'Domain contact info phone placeholder',
-						comment: 'Please use the phone number format most common for your language, ' +
-						'but it must begin with just the country code in the format \'+1\' - no parenthesis, leading zeros, etc.'
-					}
-				) }
-				{ ...this.getFieldProps( 'phone' ) } />
-		);
-	},
-
-	fields() {
-		const countryCode = formState.getFieldValue( this.state.form, 'countryCode' ),
-			fieldProps = ( name ) => this.getFieldProps( name ),
-			textOnly = true;
-
+	renderNameFields() {
 		return (
 			<div>
 				<Input
 					autoFocus
-					label={ this.translate( 'First Name', { textOnly } ) }
-					{ ...fieldProps( 'first-name' ) }/>
+					label={ this.translate( 'First Name') }
+					{ ...this.getFieldProps( 'first-name' ) } />
 
-				<Input label={ this.translate( 'Last Name', { textOnly } ) } { ...fieldProps( 'last-name' ) }/>
+				<Input label={ this.translate( 'Last Name' ) } { ...this.getFieldProps( 'last-name' ) } />
+			</div>
+		);
+	},
+
+	renderOrganizationField() {
+		return <HiddenInput
+			label={ this.translate( 'Organization' ) }
+			text={ this.translate(
+				'Registering this domain for a company? + Add Organization Name',
+				'Registering these domains for a company? + Add Organization Name',
+				{
+					context: 'Domain contact information page',
+					comment: 'Count specifies the number of domain registrations',
+					count: this.getNumberOfDomainRegistrations()
+				}
+			) }
+			{ ...this.getFieldProps( 'organization' ) } />;
+	},
+
+	renderEmailField() {
+		return (
+			<Input label={ this.translate( 'Email' ) } { ...this.getFieldProps( 'email' ) } />
+		);
+	},
+
+	renderCountryField() {
+		return (
+			<CountrySelect
+				label={ this.translate( 'Country' ) }
+				countriesList={ countriesList }
+				{ ...this.getFieldProps( 'country-code' ) } />
+		);
+	},
+
+	renderFaxField() {
+		return (
+			<Input label={ this.translate( 'Fax' ) } { ...this.getFieldProps( 'fax' ) } />
+		);
+	},
+
+	renderPhoneField() {
+		const label = this.translate( 'Phone' );
+
+		return (
+			<FormPhoneMediaInput
+				label={ label }
+				countriesList={ countriesList }
+				countryCode={ this.state.phoneCountryCode }
+				onChange={ this.handlePhoneChange }
+				{ ...omit( this.getFieldProps( 'phone' ), 'onChange' ) } />
+		);
+	},
+
+	renderAddressFields() {
+		return (
+			<div>
+				<Input label={ this.translate( 'Address' ) } maxLength={ 40 } { ...this.getFieldProps( 'address-1' ) }/>
 
 				<HiddenInput
-					label={ this.translate( 'Organization' ) }
-					text={ this.translate(
-						'Registering this domain for a company? + Add Organization Name',
-						'Registering these domains for a company? + Add Organization Name',
-						{
-							context: 'Domain contact information page',
-							comment: 'Count specifies the number of domain registrations',
-							count: this.getNumberOfDomainRegistrations(),
-							textOnly: true
-						}
-					) }
-					{ ...fieldProps( 'organization' ) }/>
-
-				<Input label={ this.translate( 'Email', { textOnly } ) } { ...fieldProps( 'email' ) }/>
-
-				{ this.renderPhoneField() }
-
-				<CountrySelect
-					label={ this.translate( 'Country', { textOnly } ) }
-					countriesList={ countriesList }
-					{ ...fieldProps( 'country-code' ) }/>
-
-				{ this.needsFax() && <Input label={ this.translate( 'Fax', { textOnly } ) } { ...fieldProps( 'fax' ) }/> }
-				<Input label={ this.translate( 'Address', { textOnly } ) } maxLength={ 40 } { ...fieldProps( 'address-1' ) }/>
-
-				<HiddenInput
-					label={ this.translate( 'Address Line 2', { textOnly } ) }
-					text={ this.translate( '+ Add Address Line 2', { textOnly } ) }
+					label={ this.translate( 'Address Line 2' ) }
+					text={ this.translate( '+ Add Address Line 2' ) }
 					maxLength={ 40 }
-					{ ...fieldProps( 'address-2' ) }/>
+					{ ...this.getFieldProps( 'address-2' ) } />
+			</div>
+		);
+	},
 
-				<Input label={ this.translate( 'City', { textOnly } ) } { ...fieldProps( 'city' ) }/>
+	renderCityField() {
+		return (
+			<Input label={ this.translate( 'City' ) } { ...this.getFieldProps( 'city' ) } />
+		);
+	},
 
-				<StateSelect
-					label={ this.translate( 'State', { textOnly: true } ) }
-					countryCode={ countryCode }
-					{ ...fieldProps( 'state' ) }/>
+	renderStateField() {
+		const countryCode = formState.getFieldValue( this.state.form, 'countryCode' );
 
-				<Input label={ this.translate( 'Postal Code', { textOnly } ) } { ...fieldProps( 'postal-code' ) }/>
+		return <StateSelect
+			label={ this.translate( 'State' ) }
+			countryCode={ countryCode }
+			{ ...this.getFieldProps( 'state' ) } />;
+	},
+
+	renderPostalCodeField() {
+		return (
+			<Input label={ this.translate( 'Postal Code' ) } { ...this.getFieldProps( 'postal-code' ) } />
+		);
+	},
+
+	renderDetailsForm() {
+		const needsOnlyGoogleAppsDetails = this.needsOnlyGoogleAppsDetails();
+
+		return (
+			<form>
+				{ this.renderNameFields() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderOrganizationField() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderEmailField() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderPhoneField() }
+				{ this.renderCountryField() }
+				{ ! needsOnlyGoogleAppsDetails && this.needsFax() && this.renderFaxField() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderAddressFields() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderCityField() }
+				{ ! needsOnlyGoogleAppsDetails && this.renderStateField() }
+				{ this.renderPostalCodeField() }
 
 				{ this.renderSubmitButton() }
-			</div>
+			</form>
 		);
 	},
 
@@ -301,14 +337,6 @@ export default React.createClass( {
 
 	openDialog() {
 		this.setState( { isDialogVisible: true } );
-	},
-
-	content() {
-		return (
-			<form>
-				{ this.fields() }
-			</form>
-		);
 	},
 
 	focusFirstError() {
@@ -336,12 +364,20 @@ export default React.createClass( {
 	},
 
 	recordSubmit() {
-		const errors = formState.getErrorMessages( this.state.form );
-		analytics.tracks.recordEvent( 'calypso_contact_information_form_submit', {
-			errors,
-			errors_count: errors && errors.length || 0,
-			submission_count: this.state.submissionCount + 1
-		} );
+		const errors = formState.getErrorMessages( this.state.form ),
+			tracksEventObject = reduce(
+				formState.getErrorMessages( this.state.form ),
+				( result, value, key ) => {
+					result[ `error_${ key }` ] = value;
+					return result;
+				},
+				{
+					errors_count: errors && errors.length || 0,
+					submission_count: this.state.submissionCount + 1
+				}
+			);
+
+		analytics.tracks.recordEvent( 'calypso_contact_information_form_submit', tracksEventObject );
 		this.setState( { submissionCount: this.state.submissionCount + 1 } );
 	},
 
@@ -363,10 +399,9 @@ export default React.createClass( {
 		this.setPrivacyProtectionSubscriptions( options.addPrivacy !== false );
 
 		const allFieldValues = Object.assign( {}, formState.getAllFieldValues( this.state.form ) );
-		if ( abtest( 'domainContactNewPhoneInput' ) === 'enabled' ) {
-			allFieldValues.phone = toIcannFormat( allFieldValues.phone, countries[ this.state.phoneCountryCode ] );
-		}
+		allFieldValues.phone = toIcannFormat( allFieldValues.phone, countries[ this.state.phoneCountryCode ] );
 		setDomainDetails( allFieldValues );
+		addGoogleAppsRegistrationData( allFieldValues );
 	},
 
 	setPrivacyProtectionSubscriptions( enable ) {
@@ -378,23 +413,30 @@ export default React.createClass( {
 	},
 
 	render() {
-		const classSet = classNames( {
-			'domain-details': true,
-			selected: true
-		} );
+		const needsOnlyGoogleAppsDetails = this.needsOnlyGoogleAppsDetails(),
+			classSet = classNames( {
+				'domain-details': true,
+				selected: true,
+				'only-google-apps-details': needsOnlyGoogleAppsDetails
+			} ),
+			titleOptions = {
+				context: 'Domain contact information page'
+			};
+
+		let title;
+		if ( needsOnlyGoogleAppsDetails ) {
+			title = this.translate( 'G Suite Account Information', titleOptions );
+		} else {
+			title = this.translate( 'Domain Contact Information', titleOptions );
+		}
 
 		return (
 			<div>
-				{ this.renderPrivacySection() }
+				{ cartItems.hasDomainRegistration( this.props.cart ) && this.renderPrivacySection() }
 				<PaymentBox
 					classSet={ classSet }
-					title={ this.translate(
-						'Domain Contact Information',
-						{
-							context: 'Domain contact information page',
-							textOnly: true
-						} ) }>
-					{ this.content() }
+					title={ title }>
+					{ this.renderDetailsForm() }
 				</PaymentBox>
 			</div>
 		);

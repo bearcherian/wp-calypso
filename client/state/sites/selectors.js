@@ -31,7 +31,7 @@ import createSelector from 'lib/create-selector';
 import { fromApi as seoTitleFromApi } from 'components/seo/meta-title-editor/mappings';
 import versionCompare from 'lib/version-compare';
 import getComputedAttributes from 'lib/site/computed-attributes';
-import { PRESSABLE_STATE_TRANSFERED, PRESSABLE_STATE_IN_TRANSFER } from './constants';
+import { getCustomizerFocus } from 'my-sites/customize/panels';
 
 /**
  * Returns a raw site object by its ID.
@@ -145,32 +145,6 @@ export function isJetpackSite( state, siteId ) {
 	}
 
 	return site.jetpack;
-}
-
-/**
- * Returns true if site is a Pressable Jetpack site or site during a transfer, false if the site is hosted on
- * WordPress.com or is a regular Jetpack, or null if the site is unknown.
- *
- * @param  {Object}   state  Global state tree
- * @param  {Number}   siteId Site ID
- * @return {?Boolean}        Whether site is a Pressable site
- */
-export function isPressableSite( state, siteId ) {
-	const site = getRawSite( state, siteId );
-	if ( ! site ) {
-		return null;
-	}
-
-	return site.options.pressable === PRESSABLE_STATE_TRANSFERED || isPressableSiteInTransfer( state, siteId );
-}
-
-export function isPressableSiteInTransfer( state, siteId ) {
-	const site = getRawSite( state, siteId );
-	if ( ! site ) {
-		return null;
-	}
-
-	return site.options.pressable === PRESSABLE_STATE_IN_TRANSFER;
 }
 
 /**
@@ -529,6 +503,10 @@ export function getSitePlan( state, siteId ) {
 	return site.plan;
 }
 
+export function getSitePlanSlug( state, siteId ) {
+	return get( getSitePlan( state, siteId ), 'product_slug' );
+}
+
 /**
  * Returns true if the current site plan is a paid one
  *
@@ -763,7 +741,25 @@ export function hasJetpackSiteJetpackThemesExtendedFeatures( state, siteId ) {
 	}
 
 	const siteJetpackVersion = getSiteOption( state, siteId, 'jetpack_version' );
-	return versionCompare( siteJetpackVersion, '4.4.2' ) >= 0;
+	return versionCompare( siteJetpackVersion, '4.7' ) >= 0;
+}
+
+/**
+ * Determines if the Jetpack site is part of multi-site.
+ * Returns null if the site is not known or is not a Jetpack site.
+ *
+ * @param  {Object}   state  Global state tree
+ * @param  {Number}   siteId Site ID
+ * @return {?Boolean}        true if the site is multi-site
+ */
+export function isJetpackSiteMultiSite( state, siteId ) {
+	const site = getRawSite( state, siteId );
+
+	if ( ! site || ! isJetpackSite( state, siteId ) ) {
+		return null;
+	}
+
+	return site.is_multisite === true;
 }
 
 /**
@@ -986,16 +982,13 @@ export function getSiteAdminUrl( state, siteId, path = '' ) {
  *
  * @param  {Object} state  Global state tree
  * @param  {Number} siteId Site ID
+ * @param  {String} panel  Optional panel to autofocus
  * @return {String}        Customizer URL
  */
-export function getCustomizerUrl( state, siteId ) {
+export function getCustomizerUrl( state, siteId, panel ) {
 	if ( ! isJetpackSite( state, siteId ) ) {
 		const siteSlug = getSiteSlug( state, siteId );
-		if ( ! siteSlug ) {
-			return null;
-		}
-
-		return `/customize/${ siteSlug }`;
+		return [ '' ].concat( compact( [ 'customize', panel, siteSlug ] ) ).join( '/' );
 	}
 
 	const adminUrl = getSiteAdminUrl( state, siteId, 'customize.php' );
@@ -1005,11 +998,12 @@ export function getCustomizerUrl( state, siteId ) {
 
 	let returnUrl;
 	if ( 'undefined' !== typeof window ) {
-		returnUrl = encodeURIComponent( window.location );
+		returnUrl = window.location.href;
 	}
 
 	return addQueryArgs( {
-		'return': returnUrl
+		'return': returnUrl,
+		...getCustomizerFocus( panel )
 	}, adminUrl );
 }
 

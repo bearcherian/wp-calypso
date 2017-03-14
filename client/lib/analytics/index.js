@@ -37,7 +37,7 @@ window.ga = window.ga || function() {
 };
 window.ga.l = +new Date();
 
-loadScript( '//stats.wp.com/w.js?55' ); // W_JS_VER
+loadScript( '//stats.wp.com/w.js?56' ); // W_JS_VER
 loadScript( '//www.google-analytics.com/analytics.js' );
 
 function buildQuerystring( group, name ) {
@@ -151,7 +151,8 @@ const analytics = {
 			if ( process.env.NODE_ENV !== 'production' ) {
 				for ( const key in eventProperties ) {
 					if ( isObjectLike( eventProperties[ key ] ) && typeof console !== 'undefined' ) {
-						console.error( `Nested properties are not supported by Tracks. Check '${ key }' on`, eventProperties ); //eslint-disable-line no-console
+						console.error( `Unable to record event "${ eventName }" because nested properties are not supported by Tracks. Check '${ key }' on`, eventProperties ); //eslint-disable-line no-console
+
 						return;
 					}
 				}

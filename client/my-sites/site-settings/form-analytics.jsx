@@ -22,9 +22,12 @@ import {
 	isJetpackBusiness
 } from 'lib/products-values';
 import { removeNotice, errorNotice } from 'state/notices/actions';
-import { isJetpackModuleActive, isJetpackMinimumVersion } from 'state/sites/selectors';
+import { getSiteOption, isJetpackMinimumVersion, isJetpackSite } from 'state/sites/selectors';
+import { isJetpackModuleActive } from 'state/selectors';
+import { getSelectedSite, getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
 import { isEnabled } from 'config';
 import { FEATURE_GOOGLE_ANALYTICS } from 'lib/plans/constants';
+import QueryJetpackModules from 'components/data/query-jetpack-modules';
 
 const validateGoogleAnalyticsCode = code => ! code || code.match( /^UA-\d+-\d+$/i );
 const hasBusinessPlan = overSome( isBusiness, isEnterprise, isJetpackBusiness );
@@ -64,37 +67,39 @@ class GoogleAnalyticsForm extends Component {
 			handleSubmitForm,
 			isRequestingSettings,
 			isSavingSettings,
+			jetpackManagementUrl,
 			jetpackModuleActive,
 			jetpackVersionSupportsModule,
 			showUpgradeNudge,
 			site,
+			siteId,
+			siteIsJetpack,
+			siteSlug,
 			translate,
 			uniqueEventTracker,
 		} = this.props;
 
-		const {
-			domain = '',
-			slug = '',
-			jetpack = false,
-		} = site;
-
 		const placeholderText = isRequestingSettings ? translate( 'Loading' ) : '';
-		const isJetpackUnsupported = jetpack && ! jetpackVersionSupportsModule && isEnabled( 'jetpack/google-analytics' );
+		const isJetpackUnsupported = siteIsJetpack && ! jetpackVersionSupportsModule && isEnabled( 'jetpack/google-analytics' );
 
 		return (
 			<form id="site-settings" onSubmit={ handleSubmitForm }>
+				{
+					siteIsJetpack &&
+					<QueryJetpackModules siteId={ siteId } />
+				}
 
 				{ showUpgradeNudge &&
 					<UpgradeNudge
 						title={ translate( 'Add Google Analytics' ) }
-						message={ jetpack
+						message={ siteIsJetpack
 							? translate( 'Upgrade to the Professional Plan and include your own analytics tracking ID.' )
 							: translate( 'Upgrade to the Business Plan and include your own analytics tracking ID.' )
 						}
 						feature={ FEATURE_GOOGLE_ANALYTICS }
 						event="google_analytics_settings"
 						icon="stats-alt"
-						jetpack= { jetpack }
+						jetpack={ siteIsJetpack }
 					/>
 				}
 
@@ -103,18 +108,18 @@ class GoogleAnalyticsForm extends Component {
 						status="is-warning"
 						showDismiss={ false }
 						text={ translate( 'Google Analytics require a newer version of Jetpack.' ) } >
-						<NoticeAction href={ `/plugins/jetpack/${ slug }` }>
+						<NoticeAction href={ `/plugins/jetpack/${ siteSlug }` }>
 							{ translate( 'Update Now' ) }
 						</NoticeAction>
 					</Notice>
 				}
 
-				{ jetpack && ! jetpackModuleActive && ! isJetpackUnsupported && ! showUpgradeNudge &&
+				{ siteIsJetpack && jetpackModuleActive === false && ! isJetpackUnsupported && ! showUpgradeNudge &&
 					<Notice
 						status="is-warning"
 						showDismiss={ false }
 						text={ translate( 'The Google Analytics module is disabled in Jetpack.' ) } >
-						<NoticeAction href={ '//' + domain + '/wp-admin/admin.php?page=jetpack#/engagement' }>
+						<NoticeAction href={ jetpackManagementUrl + 'admin.php?page=jetpack#/engagement' }>
 							{ translate( 'Enable' ) }
 						</NoticeAction>
 					</Notice>
@@ -164,7 +169,7 @@ class GoogleAnalyticsForm extends Component {
 							'normally show slightly different totals for your visits, views, etc.',
 							{
 								components: {
-									a: <a href={ '/stats/' + domain } />
+									a: <a href={ '/stats/' + site.domain } />
 								}
 							}
 						) }
@@ -194,21 +199,28 @@ class GoogleAnalyticsForm extends Component {
 	}
 }
 
-const mapStateToProps = ( state, ownProps ) => {
-	const { site } = ownProps;
-
+const mapStateToProps = ( state ) => {
+	const site = getSelectedSite( state );
+	const siteId = getSelectedSiteId( state );
+	const siteSlug = getSelectedSiteSlug( state );
 	const isGoogleAnalyticsEligible = site && site.plan && hasBusinessPlan( site.plan );
-	const jetpackModuleActive = isJetpackModuleActive( state, site.ID, 'google-analytics' );
-	const jetpackVersionSupportsModule = isJetpackMinimumVersion( state, site.ID, '4.5-beta1' );
+	const jetpackManagementUrl = getSiteOption( state, siteId, 'admin_url' );
+	const jetpackModuleActive = isJetpackModuleActive( state, siteId, 'google-analytics' );
+	const jetpackVersionSupportsModule = isJetpackMinimumVersion( state, siteId, '4.6-alpha' );
+	const siteIsJetpack = isJetpackSite( state, siteId );
 	const googleAnalyticsEnabled = site && (
-		! site.jetpack ||
-		( site.jetpack && jetpackModuleActive && jetpackVersionSupportsModule && isEnabled( 'jetpack/google-analytics' ) )
+		! siteIsJetpack ||
+		( siteIsJetpack && jetpackModuleActive && jetpackVersionSupportsModule && isEnabled( 'jetpack/google-analytics' ) )
 	);
 
 	return {
-		selectedSite: site,
+		site,
+		siteId,
+		siteSlug,
+		siteIsJetpack,
 		showUpgradeNudge: ! isGoogleAnalyticsEligible,
 		enableForm: isGoogleAnalyticsEligible && googleAnalyticsEnabled,
+		jetpackManagementUrl,
 		jetpackModuleActive,
 		jetpackVersionSupportsModule,
 	};

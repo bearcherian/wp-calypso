@@ -136,10 +136,12 @@ export function iframeIsWhitelisted( iframe ) {
 		'bandcamp.com',
 		'kickstarter.com',
 		'facebook.com',
-		'embed.itunes.apple.com'
+		'embed.itunes.apple.com',
+		'nyt.com',
+		'google.com',
 	];
-
-	const iframeSrc = iframe.src && url.parse( iframe.src ).hostname.toLowerCase();
+	const hostName = iframe.src && url.parse( iframe.src ).hostname;
+	const iframeSrc = hostName && hostName.toLowerCase();
 	return some( iframeWhitelist, function( whitelistedSuffix ) {
 		return endsWith( '.' + iframeSrc, '.' + whitelistedSuffix );
 	} );
@@ -180,4 +182,27 @@ export function isFeaturedImageInContent( post ) {
 	}
 
 	return false;
+}
+
+export function deduceImageWidthAndHeight( image ) {
+	if ( image.height && image.width ) {
+		return {
+			height: image.height,
+			width: image.width
+		};
+	}
+	if ( image.naturalHeight && image.natualWidth ) {
+		return {
+			height: image.naturalHeight,
+			width: image.naturalWidth
+		};
+	}
+	if ( image.dataset && image.dataset.origSize ) {
+		const [ width, height ] = image.dataset.origSize.split( ',' ).map( Number );
+		return {
+			width,
+			height
+		};
+	}
+	return null;
 }

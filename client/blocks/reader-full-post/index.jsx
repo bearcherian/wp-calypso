@@ -7,7 +7,6 @@ import { connect } from 'react-redux';
 import { translate } from 'i18n-calypso';
 import classNames from 'classnames';
 import config from 'config';
-import twemoji from 'twemoji';
 import { get } from 'lodash';
 
 /**
@@ -36,6 +35,7 @@ import Comments from 'blocks/comments';
 import scrollTo from 'lib/scroll-to';
 import PostExcerptLink from 'reader/post-excerpt-link';
 import { siteNameFromSiteAndPost } from 'reader/utils';
+import { keyForPost } from 'lib/feed-stream-store/post-key';
 import KeyboardShortcuts from 'lib/keyboard-shortcuts';
 import ReaderPostActions from 'blocks/reader-post-actions';
 import PostStoreActions from 'lib/feed-post-store/actions';
@@ -66,6 +66,13 @@ export class FullPostView extends React.Component {
 	}
 
 	hasScrolledToCommentAnchor = false;
+
+	componentWillMount() {
+		const self = this;
+		asyncRequire( 'twemoji', ( twemoji ) => {
+			self.setState( { twemoji }, self.parseEmoji.bind( self ) );
+		} );
+	}
 
 	componentDidMount() {
 		KeyboardShortcuts.on( 'close-full-post', this.handleBack );
@@ -217,7 +224,7 @@ export class FullPostView extends React.Component {
 			return;
 		}
 
-		twemoji.parse( this.refs.article, {
+		this.state && this.state.twemoji && this.state.twemoji.parse( this.refs.article, {
 			base: config( 'twemoji_cdn_url' )
 		} );
 	}
@@ -241,16 +248,22 @@ export class FullPostView extends React.Component {
 	goToNextPost = () => {
 		const store = getLastStore();
 		if ( store ) {
+			if ( ! store.getSelectedPostKey() ) {
+				store.selectItem( keyForPost( this.props.post ), store.id );
+			}
 			FeedStreamStoreActions.selectNextItem( store.getID() );
-			showSelectedPost( { store, postKey: store.getSelectedPost() } );
+			showSelectedPost( { store, postKey: store.getSelectedPostKey() } );
 		}
 	}
 
 	goToPreviousPost = () => {
 		const store = getLastStore();
 		if ( store ) {
+			if ( ! store.getSelectedPostKey() ) {
+				store.selectItem( keyForPost( this.props.post ), store.id );
+			}
 			FeedStreamStoreActions.selectPrevItem( store.getID() );
-			showSelectedPost( { store, postKey: store.getSelectedPost() } );
+			showSelectedPost( { store, postKey: store.getSelectedPostKey() } );
 		}
 	}
 

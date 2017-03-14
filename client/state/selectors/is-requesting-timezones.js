@@ -4,11 +4,11 @@
 import { get } from 'lodash';
 
 /**
- * Returns `true` if the client is making a timezones request.
+ * Returns true if we are requesting the timezones
  *
- * @param  {Object} state - Global state tree
- * @return {Boolean} whether a timezones request is being done
+ * @param {Object} state - Global state tree
+ * @return {Boolean} - Whether timezones is being requested
  */
 export default function isRequestingTimezones( state ) {
-	return get( state, 'timezones.requesting', false );
+	return get( state, 'timezones.isRequesting', false );
 }

@@ -3,8 +3,6 @@
  */
 import React from 'react';
 import { has } from 'lodash';
-import twemoji from 'twemoji';
-import emojiText from 'emoji-text';
 
 /**
  * Internal Dependencies
@@ -22,6 +20,8 @@ import HeaderBack from 'reader/header-back';
 
 const TagStream = React.createClass( {
 
+	_isMounted: false,
+
 	propTypes: {
 		tag: React.PropTypes.string
 	},
@@ -29,11 +29,33 @@ const TagStream = React.createClass( {
 	smartSetState: smartSetState,
 
 	getInitialState() {
+		const title = this.getTitle();
 		return {
-			title: this.getTitle(),
+			title,
 			subscribed: this.isSubscribed(),
-			canFollow: has( ReaderTags.get( this.props.tag ), 'ID' )
+			canFollow: has( ReaderTags.get( this.props.tag ), 'ID' ),
+			isEmojiTitle: false
 		};
+	},
+
+	componentWillMount() {
+		const self = this;
+		this._isMounted = true;
+		// can't use arrows with asyncRequire
+		asyncRequire( 'emoji-text', function( emojiText ) {
+			if ( self._isMounted ) {
+				self.setState( { emojiText } );
+			}
+		} );
+		asyncRequire( 'twemoji', function( twemoji ) {
+			if ( self._isMounted ) {
+				const title = self.state && self.state.title;
+				self.setState( {
+					twemoji,
+					isEmojiTitle: title && twemoji.test( title )
+				} );
+			}
+		} );
 	},
 
 	componentDidMount() {
@@ -42,6 +64,7 @@ const TagStream = React.createClass( {
 	},
 
 	componentWillUnmount() {
+		this._isMounted = false;
 		ReaderTags.off( 'change', this.updateState );
 		TagSubscriptions.off( 'change', this.updateState );
 	},
@@ -53,10 +76,12 @@ const TagStream = React.createClass( {
 	},
 
 	updateState( props = this.props ) {
+		const title = this.getTitle( props );
 		const newState = {
-			title: this.getTitle( props ),
+			title,
 			subscribed: this.isSubscribed( props ),
-			canFollow: has( ReaderTags.get( props.tag ), 'ID' )
+			canFollow: has( ReaderTags.get( props.tag ), 'ID' ),
+			isEmojiTitle: title && this.state.twemoji && this.state.twemoji.test( title )
 		};
 		this.smartSetState( newState );
 	},
@@ -68,7 +93,7 @@ const TagStream = React.createClass( {
 			return props.tag;
 		}
 
-		return tag.display_name || tag.slug;
+		return decodeURIComponent( tag.display_name || tag.slug );
 	},
 
 	isSubscribed( props = this.props ) {
@@ -96,8 +121,8 @@ const TagStream = React.createClass( {
 		let imageSearchString = this.props.tag;
 
 		// If the tag contains emoji, convert to text equivalent
-		if ( twemoji.test( title ) ) {
-			imageSearchString = emojiText.convert( title, {
+		if ( this.state.emojiText && this.state.isEmojiTitle ) {
+			imageSearchString = this.state.emojiText.convert( title, {
 				delimiter: ''
 			} );
 		}

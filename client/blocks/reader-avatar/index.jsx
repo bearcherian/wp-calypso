@@ -12,7 +12,7 @@ import SiteIcon from 'blocks/site-icon';
 import { localize } from 'i18n-calypso';
 import classnames from 'classnames';
 
-const ReaderAvatar = ( { author, siteIcon, feedIcon, siteUrl, preferGravatar = false, showPlaceholder = false } ) => {
+const ReaderAvatar = ( { author, siteIcon, feedIcon, siteUrl, siteIconSize = 96, preferGravatar = false, showPlaceholder = false } ) => {
 	let fakeSite;
 	if ( siteIcon ) {
 		fakeSite = {
@@ -28,12 +28,12 @@ const ReaderAvatar = ( { author, siteIcon, feedIcon, siteUrl, preferGravatar = f
 		};
 	}
 
-	let hasSiteIcon = !! siteIcon;
+	let hasSiteIcon = !! ( fakeSite && fakeSite.icon );
 	let hasAvatar = !! ( author && author.has_avatar );
 
 	if ( hasSiteIcon && hasAvatar ) {
 		// Do these both reference the same image? Disregard query string params.
-		const [ withoutQuery, ] = siteIcon.split( '?' );
+		const [ withoutQuery, ] = fakeSite.icon.img.split( '?' );
 		if ( startsWith( author.avatar_URL, withoutQuery ) ) {
 			hasAvatar = false;
 		}
@@ -55,9 +55,9 @@ const ReaderAvatar = ( { author, siteIcon, feedIcon, siteUrl, preferGravatar = f
 		}
 	);
 
-	const siteIconElement = hasSiteIcon && <SiteIcon key="site-icon" size={ 96 } site={ fakeSite } />;
-	const feedIconElement = ( hasAvatar || showPlaceholder ) && <Gravatar key="feed-icon" user={ author } size={ hasBothIcons ? 32 : 96 } />;
-	const iconElements = [ siteIconElement, feedIconElement ];
+	const siteIconElement = hasSiteIcon && <SiteIcon key="site-icon" size={ siteIconSize } site={ fakeSite } />;
+	const avatarElement = ( hasAvatar || showPlaceholder ) && <Gravatar key="author-avatar" user={ author } size={ hasBothIcons ? 32 : 96 } />;
+	const iconElements = [ siteIconElement, avatarElement ];
 
 	return (
 		<div className={ classes }>

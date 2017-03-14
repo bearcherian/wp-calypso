@@ -3,31 +3,32 @@
  */
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { flowRight, partialRight, pick } from 'lodash';
+import { flowRight, pick } from 'lodash';
 
 /**
  * Internal dependencies
  */
-import wrapSettingsForm from './wrap-settings-form';
+import Button from 'components/button';
+import Card from 'components/card';
+import CommentDisplaySettings from './comment-display-settings';
 import FormFieldset from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
 import FormLegend from 'components/forms/form-legend';
-import FormTextarea from 'components/forms/form-textarea';
-import FormTextInput from 'components/forms/form-text-input';
-import FormToggle from 'components/forms/form-toggle';
 import FormSelect from 'components/forms/form-select';
 import FormSettingExplanation from 'components/forms/form-setting-explanation';
-import Card from 'components/card';
-import Button from 'components/button';
+import FormTextarea from 'components/forms/form-textarea';
+import FormTextInput from 'components/forms/form-text-input';
+import CompactFormToggle from 'components/forms/form-toggle/compact';
+import QueryJetpackModules from 'components/data/query-jetpack-modules';
 import SectionHeader from 'components/section-header';
+import Subscriptions from './subscriptions';
+import wrapSettingsForm from './wrap-settings-form';
 import {
-	isJetpackModuleActive,
 	isJetpackSite,
 	siteSupportsJetpackSettingsUi
 } from 'state/sites/selectors';
+import { isJetpackModuleActive } from 'state/selectors';
 import { getSelectedSiteId } from 'state/ui/selectors';
-import Subscriptions from './subscriptions';
-import QueryJetpackModules from 'components/data/query-jetpack-modules';
 
 class SiteSettingsFormDiscussion extends Component {
 	handleCommentOrder = () => {
@@ -35,37 +36,59 @@ class SiteSettingsFormDiscussion extends Component {
 		this.props.updateFields( {
 			comment_order: this.props.fields.comment_order === 'desc' ? 'asc' : 'desc'
 		} );
-	};
+	}
 
 	defaultArticleSettings() {
 		const { fields, handleToggle, isRequestingSettings, translate } = this.props;
 		return (
 			<FormFieldset>
-				<FormToggle
-					className="is-compact"
+				<CompactFormToggle
 					checked={ !! fields.default_pingback_flag }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'default_pingback_flag' ) }>
 					<span>{ translate( 'Attempt to notify any blogs linked to from the article' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.default_ping_status }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'default_ping_status' ) }>
 					<span>{ translate( 'Allow link notifications from other blogs (pingbacks and trackbacks)' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.default_comment_status }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'default_comment_status' ) }>
 					<span>{ translate( 'Allow people to post comments on new articles' ) }</span>
-				</FormToggle>
+				</CompactFormToggle>
 				<FormSettingExplanation>
-					{ translate( '(These settings may be overridden for individual articles.)' ) }
+					{ translate( 'These settings may be overridden for individual articles.' ) }
 				</FormSettingExplanation>
 			</FormFieldset>
+		);
+	}
+
+	commentDisplaySettings() {
+		const { isJetpack, jetpackSettingsUISupported } = this.props;
+		if ( ! isJetpack || ! jetpackSettingsUISupported ) {
+			return null;
+		}
+
+		const { fields, isRequestingSettings, isSavingSettings, onChangeField } = this.props;
+
+		const commentDisplaySettingsFields = {
+			highlander_comment_form_prompt: fields.highlander_comment_form_prompt,
+			jetpack_comment_form_color_scheme: fields.jetpack_comment_form_color_scheme,
+		};
+
+		return (
+			<div>
+				<QueryJetpackModules siteId={ this.props.siteId } />
+				<CommentDisplaySettings
+					onChangeField={ onChangeField }
+					submittingForm={ isRequestingSettings || isSavingSettings }
+					fields={ commentDisplaySettingsFields } />
+				<hr />
+			</div>
 		);
 	}
 
@@ -74,22 +97,19 @@ class SiteSettingsFormDiscussion extends Component {
 		const markdownSupported = fields.markdown_supported;
 		return (
 			<FormFieldset className="site-settings__other-comment-settings">
-				<FormToggle
-					className="is-compact"
+				<CompactFormToggle
 					checked={ !! fields.require_name_email }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'require_name_email' ) }>
 					<span>{ translate( 'Comment author must fill out name and e-mail' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.comment_registration }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'comment_registration' ) }>
 					<span>{ translate( 'Users must be registered and logged in to comment' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.close_comments_for_old_posts }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'close_comments_for_old_posts' ) }>
@@ -106,9 +126,8 @@ class SiteSettingsFormDiscussion extends Component {
 							)
 						}
 					</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.thread_comments }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'thread_comments' ) }>
@@ -121,9 +140,8 @@ class SiteSettingsFormDiscussion extends Component {
 							} )
 						}
 					</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.page_comments }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'page_comments' ) }>
@@ -141,10 +159,9 @@ class SiteSettingsFormDiscussion extends Component {
 							)
 						}
 					</span>
-				</FormToggle>
+				</CompactFormToggle>
 				{ markdownSupported &&
-					<FormToggle
-						className="is-compact"
+					<CompactFormToggle
 						checked={ !! fields.wpcom_publish_comments_with_markdown }
 						disabled={ isRequestingSettings }
 						onChange={ handleToggle( 'wpcom_publish_comments_with_markdown' ) }>
@@ -160,15 +177,14 @@ class SiteSettingsFormDiscussion extends Component {
 								} )
 							}
 						</span>
-					</FormToggle>
+					</CompactFormToggle>
 				}
-				<FormToggle
-					className="is-compact"
+				<CompactFormToggle
 					checked={ 'asc' === fields.comment_order }
 					disabled={ isRequestingSettings }
 					onChange={ this.handleCommentOrder }>
 					<span>{ translate( 'Comments should be displayed with the older comments at the top of each page' ) }</span>
-				</FormToggle>
+				</CompactFormToggle>
 			</FormFieldset>
 		);
 	}
@@ -249,20 +265,18 @@ class SiteSettingsFormDiscussion extends Component {
 		return (
 			<FormFieldset>
 				<FormLegend>{ translate( 'E-mail me whenever' ) }</FormLegend>
-				<FormToggle
-					className="is-compact"
+				<CompactFormToggle
 					checked={ !! fields.comments_notify }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'comments_notify' ) }>
 					<span>{ translate( 'Anyone posts a comment' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.moderation_notify }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'moderation_notify' ) }>
 					<span>{ translate( 'A comment is held for moderation' ) }</span>
-				</FormToggle>
+				</CompactFormToggle>
 				{ this.emailMeLikes() }
 				{ this.emailMeReblogs() }
 				{ this.emailMeFollows() }
@@ -278,13 +292,12 @@ class SiteSettingsFormDiscussion extends Component {
 		}
 
 		return (
-			<FormToggle
-				className="is-compact"
+			<CompactFormToggle
 				checked={ !! fields.social_notifications_like }
 				disabled={ isRequestingSettings }
 				onChange={ handleToggle( 'social_notifications_like' ) }>
 				<span>{ translate( 'Someone likes one of my posts' ) }</span>
-			</FormToggle>
+			</CompactFormToggle>
 		);
 	}
 
@@ -296,13 +309,12 @@ class SiteSettingsFormDiscussion extends Component {
 		}
 
 		return (
-			<FormToggle
-				className="is-compact"
+			<CompactFormToggle
 				checked={ !! fields.social_notifications_reblog }
 				disabled={ isRequestingSettings }
 				onChange={ handleToggle( 'social_notifications_reblog' ) }>
 				<span>{ translate( 'Someone reblogs one of my posts' ) }</span>
-			</FormToggle>
+			</CompactFormToggle>
 		);
 	}
 
@@ -314,13 +326,12 @@ class SiteSettingsFormDiscussion extends Component {
 		}
 
 		return (
-			<FormToggle
-				className="is-compact"
+			<CompactFormToggle
 				checked={ !! fields.social_notifications_subscribe }
 				disabled={ isRequestingSettings }
 				onChange={ handleToggle( 'social_notifications_subscribe' ) }>
 				<span>{ translate( 'Someone follows my blog' ) }</span>
-			</FormToggle>
+			</CompactFormToggle>
 		);
 	}
 
@@ -329,20 +340,18 @@ class SiteSettingsFormDiscussion extends Component {
 		return (
 			<FormFieldset>
 				<FormLegend>{ translate( 'Before a comment appears' ) }</FormLegend>
-				<FormToggle
-					className="is-compact"
+				<CompactFormToggle
 					checked={ !! fields.comment_moderation }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'comment_moderation' ) }>
 					<span>{ translate( 'Comment must be manually approved' ) }</span>
-				</FormToggle>
-				<FormToggle
-					className="is-compact"
+				</CompactFormToggle>
+				<CompactFormToggle
 					checked={ !! fields.comment_whitelist }
 					disabled={ isRequestingSettings }
 					onChange={ handleToggle( 'comment_whitelist' ) }>
 					<span>{ translate( 'Comment author must have a previously approved comment' ) }</span>
-				</FormToggle>
+				</CompactFormToggle>
 			</FormFieldset>
 		);
 	}
@@ -350,7 +359,7 @@ class SiteSettingsFormDiscussion extends Component {
 	commentModerationSettings() {
 		const { eventTracker, fields, isRequestingSettings, onChangeField, translate, uniqueEventTracker } = this.props;
 		return (
-			<FormFieldset>
+			<FormFieldset className="site-settings__moderation-settings">
 				<FormLegend>{ translate( 'Comment Moderation' ) }</FormLegend>
 				<p>{
 					translate(
@@ -433,7 +442,7 @@ class SiteSettingsFormDiscussion extends Component {
 	}
 
 	renderSectionHeader( title, showButton = true ) {
-		const { handleSubmitForm, isRequestingSettings, isSavingSettings, translate } = this.props;
+		const { handleSubmitForm, isRequestingSettings, isSavingSettings, translate } = this.props;
 		return (
 			<SectionHeader label={ title }>
 				{ showButton &&
@@ -458,6 +467,7 @@ class SiteSettingsFormDiscussion extends Component {
 			isRequestingSettings,
 			isSavingSettings,
 			isJetpack,
+			isSubscriptionsModuleActive,
 			jetpackSettingsUISupported,
 			translate
 		} = this.props;
@@ -470,6 +480,7 @@ class SiteSettingsFormDiscussion extends Component {
 
 				{ this.renderSectionHeader( translate( 'Comments' ) ) }
 				<Card className="site-settings__discussion-settings">
+					{ this.commentDisplaySettings() }
 					{ this.otherCommentSettings() }
 					<hr />
 					{ this.emailMeSettings() }
@@ -486,7 +497,7 @@ class SiteSettingsFormDiscussion extends Component {
 						<div>
 							<QueryJetpackModules siteId={ siteId } />
 
-							{ this.renderSectionHeader( translate( 'Subscriptions' ) ) }
+							{ this.renderSectionHeader( translate( 'Subscriptions' ), isSubscriptionsModuleActive !== false ) }
 
 							<Subscriptions
 								onSubmitForm={ handleSubmitForm }
@@ -506,51 +517,59 @@ class SiteSettingsFormDiscussion extends Component {
 const connectComponent = connect(
 	( state ) => {
 		const siteId = getSelectedSiteId( state );
+
 		const isJetpack = isJetpackSite( state, siteId );
 		const jetpackSettingsUISupported = siteSupportsJetpackSettingsUi( state, siteId );
 		const isLikesModuleActive = isJetpackModuleActive( state, siteId, 'likes' );
+		const isSubscriptionsModuleActive = isJetpackModuleActive( state, siteId, 'subscriptions' );
 
 		return {
 			siteId,
 			isJetpack,
 			jetpackSettingsUISupported,
 			isLikesModuleActive,
+			isSubscriptionsModuleActive,
 		};
 	}
 );
 
-const getFormSettings = partialRight( pick, [
-	'default_pingback_flag',
-	'default_ping_status',
-	'default_comment_status',
-	'require_name_email',
-	'comment_registration',
-	'close_comments_for_old_posts',
-	'close_comments_days_old',
-	'thread_comments',
-	'thread_comments_depth',
-	'page_comments',
-	'comments_per_page',
-	'default_comments_page',
-	'comment_order',
-	'comments_notify',
-	'moderation_notify',
-	'likes',
-	'social_notifications_like',
-	'social_notifications_reblog',
-	'social_notifications_subscribe',
-	'comment_moderation',
-	'comment_whitelist',
-	'comment_max_links',
-	'moderation_keys',
-	'blacklist_keys',
-	'admin_url',
-	'wpcom_publish_comments_with_markdown',
-	'markdown_supported',
-	'subscriptions',
-	'stb_enabled',
-	'stc_enabled',
-] );
+const getFormSettings = settings => {
+	return pick( settings, [
+		'default_pingback_flag',
+		'default_ping_status',
+		'default_comment_status',
+		'require_name_email',
+		'comments',
+		'comment_registration',
+		'close_comments_for_old_posts',
+		'close_comments_days_old',
+		'thread_comments',
+		'thread_comments_depth',
+		'page_comments',
+		'comments_per_page',
+		'default_comments_page',
+		'comment_order',
+		'comments_notify',
+		'moderation_notify',
+		'likes',
+		'social_notifications_like',
+		'social_notifications_reblog',
+		'social_notifications_subscribe',
+		'comment_moderation',
+		'comment_whitelist',
+		'comment_max_links',
+		'moderation_keys',
+		'blacklist_keys',
+		'admin_url',
+		'wpcom_publish_comments_with_markdown',
+		'markdown_supported',
+		'highlander_comment_form_prompt',
+		'jetpack_comment_form_color_scheme',
+		'subscriptions',
+		'stb_enabled',
+		'stc_enabled',
+	] );
+};
 
 export default flowRight(
 	connectComponent,

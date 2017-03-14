@@ -1,9 +1,7 @@
 /**
  * External dependencies
  */
-import map from 'lodash/map';
-import head from 'lodash/head';
-import get from 'lodash/get';
+import { map, head, get } from 'lodash';
 
 /**
  * Internal dependencies
@@ -36,6 +34,15 @@ export const getHappychatConnectionStatus = createSelector(
 
 export const isHappychatChatActive = createSelector(
 	state => state.happychat.chatStatus !== HAPPYCHAT_CHAT_STATUS_DEFAULT,
+	state => state.happychat.chatStatus
+);
+
+/**
+ * Gets the current chat session status
+ * @param {Object} state - global redux state
+ * @return {String} status of the current chat session
+ */
+export const getHappychatStatus = createSelector(
 	state => state.happychat.chatStatus
 );
 

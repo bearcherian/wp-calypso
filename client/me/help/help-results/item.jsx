@@ -4,6 +4,7 @@
 import React from 'react';
 import PureRenderMixin from 'react-pure-render/mixin';
 import Gridicon from 'gridicons';
+import { decodeEntities } from 'lib/formatting';
 
 /**
  * Internal dependencies
@@ -46,8 +47,8 @@ module.exports = React.createClass( {
 			<a className="help-result" href={ this.props.helpLink.link } target="__blank" onClick={ this.onClick }>
 				<CompactCard className="help-result__wrapper">
 					{ this.getResultIcon() }
-					<h2 className="help-result__title">{ this.props.helpLink.title }</h2>
-					<p className="help-result__description">{ this.props.helpLink.description }</p>
+					<h2 className="help-result__title">{ decodeEntities(this.props.helpLink.title) }</h2>
+					<p className="help-result__description">{ decodeEntities(this.props.helpLink.description) }</p>
 				</CompactCard>
 			</a>
 		);

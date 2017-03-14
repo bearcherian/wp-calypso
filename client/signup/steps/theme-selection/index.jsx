@@ -5,7 +5,7 @@ import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
 import classNames from 'classnames';
 import { localize } from 'i18n-calypso';
-import { identity } from 'lodash';
+import { find, identity } from 'lodash';
 
 /**
  * Internal dependencies
@@ -16,6 +16,7 @@ import SignupThemesList from './signup-themes-list';
 import PressableThemeStep from './pressable-theme';
 import StepWrapper from 'signup/step-wrapper';
 import Button from 'components/button';
+import { themes } from 'lib/signup/themes-data';
 
 import { getSurveyVertical } from 'state/signup/steps/survey/selectors';
 
@@ -38,7 +39,8 @@ class ThemeSelectionStep extends Component {
 		showPressable: false,
 	};
 
-	pickTheme = ( theme ) => {
+	pickTheme = ( themeId ) => {
+		const theme = find( themes, { slug: themeId } );
 		const repoSlug = `${ theme.repo }/${ theme.slug }`;
 
 		analytics.tracks.recordEvent( 'calypso_signup_theme_select', {
@@ -66,13 +68,34 @@ class ThemeSelectionStep extends Component {
 	};
 
 	renderThemesList() {
+		const pressableWrapperClassName = classNames(
+			'theme-selection__pressable-wrapper',
+			{ 'is-hidden': ! this.state.showPressable }
+		);
+
+		const themesWrapperClassName = classNames(
+			'theme-selection__themes-wrapper',
+			{ 'is-hidden': this.state.showPressable }
+		);
+
 		return (
-			<SignupThemesList
-				surveyQuestion={ this.props.chosenSurveyVertical }
-				designType={ this.props.designType || this.props.signupDependencies.designType }
-				handleScreenshotClick={ this.pickTheme }
-				handleThemeUpload={ this.handleThemeUpload }
-			/>
+			<div className="theme-selection__pressable-substep-wrapper">
+				<div className={ pressableWrapperClassName }>
+					<PressableThemeStep
+						{ ...this.props }
+						onBackClick={ this.handleStoreBackClick }
+					/>
+				</div>
+				<div className={ themesWrapperClassName }>
+					<SignupThemesList
+						className={ themesWrapperClassName }
+						surveyQuestion={ this.props.chosenSurveyVertical }
+						designType={ this.props.designType || this.props.signupDependencies.designType }
+						handleScreenshotClick={ this.pickTheme }
+						handleThemeUpload={ this.handleThemeUpload }
+					/>
+				</div>
+			</div>
 		);
 	}
 
@@ -101,42 +124,31 @@ class ThemeSelectionStep extends Component {
 
 	render = () => {
 		const defaultDependencies = this.props.useHeadstart ? { themeSlugWithRepo: 'pub/twentysixteen' } : undefined;
-
-		const pressableWrapperClassName = classNames( {
-			'theme-selection__pressable-wrapper': true,
-			'is-hidden': ! this.state.showPressable,
-		} );
-
-		const themesWrapperClassName = classNames( {
-			'theme-selection__themes-wrapper': true,
-			'is-hidden': this.state.showPressable,
-		} );
-
 		const { translate } = this.props;
 
+		const headerText = this.state.showPressable
+			? translate( 'Upload your WordPress Theme' )
+			: translate( 'Choose a theme.' );
+
+		const subHeaderText = this.state.showPressable
+			? translate( 'Our partner Pressable is here to help you', {
+				context: 'Subheader text in Signup, when a user chooses the Upload theme in the Themes step'
+			} )
+			: translate( 'No need to overthink it. You can always switch to a different theme later.', {
+				context: 'Themes step subheader in Signup'
+			} );
+
 		return (
-			<div>
-				<div className={ pressableWrapperClassName } >
-					<PressableThemeStep
-						{ ... this.props }
-						onBackClick={ this.handleStoreBackClick }
-					/>
-				</div>
-				<div className={ themesWrapperClassName } >
-					<StepWrapper
-						fallbackHeaderText={ translate( 'Choose a theme.' ) }
-						fallbackSubHeaderText={
-							translate( 'No need to overthink it. You can always switch to a different theme later.' )
-						}
-						subHeaderText={
-							translate( 'Choose a theme. You can always switch to a different theme later.' )
-						}
-						stepContent={ this.renderThemesList() }
-						defaultDependencies={ defaultDependencies }
-						headerButton={ this.renderJetpackButton() }
-						{ ...this.props } />
-					</div>
-			</div>
+			<StepWrapper
+				fallbackHeaderText={ headerText }
+				fallbackSubHeaderText={ subHeaderText }
+				subHeaderText={ subHeaderText }
+				stepContent={ this.renderThemesList() }
+				defaultDependencies={ defaultDependencies }
+				headerButton={ this.renderJetpackButton() }
+				shouldHideNavButtons={ this.state.showPressable }
+				{ ...this.props }
+			/>
 		);
 	}
 }

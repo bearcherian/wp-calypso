@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { filter, map, property, delay } from 'lodash';
+import { filter, map, property, delay, endsWith } from 'lodash';
 import debugFactory from 'debug';
 import page from 'page';
 
@@ -34,22 +34,29 @@ import {
 	THEME_TRANSFER_INITIATE_SUCCESS,
 	THEME_TRANSFER_STATUS_FAILURE,
 	THEME_TRANSFER_STATUS_RECEIVE,
-	THEME_TRY_AND_CUSTOMIZE_FAILURE,
 	THEME_UPLOAD_START,
 	THEME_UPLOAD_SUCCESS,
 	THEME_UPLOAD_FAILURE,
 	THEME_UPLOAD_CLEAR,
 	THEME_UPLOAD_PROGRESS,
-	THEMES_RECEIVE,
 	THEMES_REQUEST,
 	THEMES_REQUEST_SUCCESS,
 	THEMES_REQUEST_FAILURE,
+	THEME_PREVIEW_OPTIONS,
+	THEME_PREVIEW_STATE,
 } from 'state/action-types';
 import {
 	recordTracksEvent,
 	withAnalytics
 } from 'state/analytics/actions';
-import { getTheme, getActiveTheme, getLastThemeQuery, getThemeCustomizeUrl } from './selectors';
+import {
+	getTheme,
+	getActiveTheme,
+	getLastThemeQuery,
+	getThemeCustomizeUrl,
+	getWpcomParentThemeId,
+	shouldFilterWpcomThemes,
+} from './selectors';
 import {
 	getThemeIdFromStylesheet,
 	isThemeMatchingQuery,
@@ -58,14 +65,10 @@ import {
 	normalizeWpcomTheme,
 	normalizeWporgTheme
 } from './utils';
-import {
-	getSiteTitle,
-	hasJetpackSiteJetpackThemesExtendedFeatures,
-	isJetpackSite
-} from 'state/sites/selectors';
+import { getSiteTitle, isJetpackSite } from 'state/sites/selectors';
+import { isSiteAutomatedTransfer } from 'state/selectors';
 import i18n from 'i18n-calypso';
 import accept from 'lib/accept';
-import config from 'config';
 
 const debug = debugFactory( 'calypso:themes:actions' ); //eslint-disable-line no-unused-vars
 
@@ -90,40 +93,64 @@ export function receiveTheme( theme, siteId ) {
 }
 
 /**
- * Returns an action object to be used in signalling that theme objects have
- * been received.
+ * Returns an action object to be used in signalling that theme objects from
+ * a query have been received.
  *
- * @param  {Array}  themes Themes received
- * @param  {Number} siteId ID of site for which themes have been received
- * @return {Object}        Action object
+ * @param {Array}  themes Themes received
+ * @param {number} siteId ID of site for which themes have been received
+ * @param {?Object} query Theme query used in the API request
+ * @param {?number} foundCount Number of themes returned by the query
+ * @return {Object} Action object
  */
-export function receiveThemes( themes, siteId ) {
-	return {
-		type: THEMES_RECEIVE,
-		themes,
-		siteId
+export function receiveThemes( themes, siteId, query, foundCount ) {
+	return ( dispatch, getState ) => {
+		let filteredThemes = themes;
+		let found = foundCount;
+
+		if ( isJetpackSite( getState(), siteId ) ) {
+			/*
+			 * We need to do client-side filtering for Jetpack sites because:
+			 * 1) Jetpack theme API does not support search queries
+			 * 2) We need to filter out all wpcom themes to show an 'Uploaded' list
+			 */
+			const filterWpcom = shouldFilterWpcomThemes( getState(), siteId );
+			filteredThemes = filter(
+				themes,
+				theme => (
+					isThemeMatchingQuery( query, theme ) &&
+						! ( filterWpcom && isThemeFromWpcom( theme ) )
+				)
+			);
+			// Jetpack API returns all themes in one response (no paging)
+			found = filteredThemes.length;
+		}
+
+		dispatch( {
+			type: THEMES_REQUEST_SUCCESS,
+			themes: filteredThemes,
+			siteId,
+			query,
+			found,
+		} );
 	};
 }
 
 /**
  * Triggers a network request to fetch themes for the specified site and query.
  *
- * @param  {Number|String} siteId Jetpack site ID or 'wpcom' for any WPCOM site
- * @param  {String}        query  Theme query
- * @return {Function}             Action thunk
+ * @param  {Number|String} siteId        Jetpack site ID or 'wpcom' for any WPCOM site
+ * @param  {Object}        query         Theme query
+ * @param  {String}        query.search  Search string
+ * @param  {String}        query.tier    Theme tier: 'free', 'premium', or '' (either)
+ * @param  {String}        query.filter  Filter
+ * @param  {Number}        query.number  How many themes to return per page
+ * @param  {Number}        query.offset  At which item to start the set of returned themes
+ * @param  {Number}        query.page    Which page of matching themes to return
+ * @return {Function}                    Action thunk
  */
 export function requestThemes( siteId, query = {} ) {
-	return ( dispatch, getState ) => {
+	return ( dispatch ) => {
 		const startTime = new Date().getTime();
-		let siteIdToQuery, queryWithApiVersion;
-
-		if ( siteId === 'wpcom' ) {
-			siteIdToQuery = null;
-			queryWithApiVersion = { ...query, apiVersion: '1.2' };
-		} else {
-			siteIdToQuery = siteId;
-			queryWithApiVersion = { ...query, apiVersion: '1' };
-		}
 
 		dispatch( {
 			type: THEMES_REQUEST,
@@ -131,30 +158,27 @@ export function requestThemes( siteId, query = {} ) {
 			query
 		} );
 
-		return wpcom.undocumented().themes( siteIdToQuery, queryWithApiVersion ).then( ( { found, themes: rawThemes } ) => {
+		let request;
+
+		if ( siteId === 'wporg' ) {
+			request = () => wporg.fetchThemesList( query );
+		} else if ( siteId === 'wpcom' ) {
+			request = () => wpcom.undocumented().themes( null, { ...query, apiVersion: '1.2' } );
+		} else {
+			request = () => wpcom.undocumented().themes( siteId, { ...query, apiVersion: '1' } );
+		}
+
+		// WP.com returns the number of results in a `found` attr, so we can use that right away.
+		// WP.org returns an `info` object containing a `results` number, so we destructure that
+		// and use it as default value for `found`.
+		return request().then( ( { themes: rawThemes, info: { results } = {}, found = results } ) => {
 			let themes;
-			let filteredThemes;
-			if ( siteId !== 'wpcom' ) {
-				themes = map( rawThemes, normalizeJetpackTheme );
-
-				// A Jetpack site's themes endpoint ignores the query,
-				// returning an unfiltered list of all installed themes instead.
-				// So we have to filter on the client side.
-				// Also if Jetpack plugin has Themes Extended Features,
-				// we filter out -wpcom suffixed themes because we will show them in
-				// second list that is specific to WorpPress.com themes.
-				const keepWpcom = ! config.isEnabled( 'manage/themes/upload' ) ||
-					! hasJetpackSiteJetpackThemesExtendedFeatures( getState(), siteId );
-
-				filteredThemes = filter(
-					themes,
-					theme => isThemeMatchingQuery( query, theme ) && ( keepWpcom || ! isThemeFromWpcom( theme.id ) )
-				);
-				// The Jetpack specific endpoint doesn't return the number of `found` themes, so we calculate it ourselves.
-				found = filteredThemes.length;
-			} else {
+			if ( siteId === 'wporg' ) {
+				themes = map( rawThemes, normalizeWporgTheme );
+			} else if ( siteId === 'wpcom' ) {
 				themes = map( rawThemes, normalizeWpcomTheme );
-				filteredThemes = themes;
+			} else { // Jetpack Site
+				themes = map( rawThemes, normalizeJetpackTheme );
 			}
 
 			if ( query.search && query.page === 1 ) {
@@ -166,21 +190,13 @@ export function requestThemes( siteId, query = {} ) {
 						tier: query.tier,
 						response_time_in_ms: responseTime,
 						result_count: found,
-						results_first_page: filteredThemes.map( property( 'id' ) ).join()
+						results_first_page: themes.map( property( 'id' ) ).join()
 					}
 				);
 				dispatch( trackShowcaseSearch );
 			}
 
-			// receiveThemes is query-agnostic, so it gets its themes unfiltered
-			dispatch( receiveThemes( themes, siteId ) );
-			dispatch( {
-				type: THEMES_REQUEST_SUCCESS,
-				themes: filteredThemes,
-				siteId,
-				query,
-				found,
-			} );
+			dispatch( receiveThemes( themes, siteId, query, found ) );
 		} ).catch( ( error ) => {
 			dispatch( {
 				type: THEMES_REQUEST_FAILURE,
@@ -313,6 +329,29 @@ export function requestActiveTheme( siteId ) {
 
 /**
  * Triggers a network request to activate a specific theme on a given site.
+ * If it's a Jetpack site, installs the theme prior to activation if it isn't already.
+ *
+ * @param  {String}   themeId   Theme ID
+ * @param  {Number}   siteId    Site ID
+ * @param  {String}   source    The source that is reuquesting theme activation, e.g. 'showcase'
+ * @param  {Boolean}  purchased Whether the theme has been purchased prior to activation
+ * @return {Function}           Action thunk
+ */
+export function activate( themeId, siteId, source = 'unknown', purchased = false ) {
+	return ( dispatch, getState ) => {
+		if ( isJetpackSite( getState(), siteId ) && ! getTheme( getState(), siteId, themeId ) ) {
+			const installId = suffixThemeIdForInstall( getState(), siteId, themeId );
+			// If theme is already installed, installation will silently fail,
+			// and it will just be activated.
+			return dispatch( installAndActivateTheme( installId, siteId, source, purchased ) );
+		}
+
+		return dispatch( activateTheme( themeId, siteId, source, purchased ) );
+	};
+}
+
+/**
+ * Triggers a network request to activate a specific theme on a given site.
  *
  * @param  {String}   themeId   Theme ID
  * @param  {Number}   siteId    Site ID
@@ -391,7 +430,7 @@ export function themeActivated( themeStylesheet, siteId, source = 'unknown', pur
  * @return {Function}         Action thunk
  */
 export function installTheme( themeId, siteId ) {
-	return ( dispatch ) => {
+	return ( dispatch, getState ) => {
 		dispatch( {
 			type: THEME_INSTALL,
 			siteId,
@@ -406,6 +445,17 @@ export function installTheme( themeId, siteId ) {
 					siteId,
 					themeId
 				} );
+			} )
+			.then( () => {
+				if ( endsWith( themeId, '-wpcom' ) ) {
+					const parentThemeId = getWpcomParentThemeId(
+						getState(),
+						themeId.replace( '-wpcom', '' )
+					);
+					if ( parentThemeId ) {
+						dispatch( installTheme( parentThemeId + '-wpcom', siteId ) );
+					}
+				}
 			} )
 			.catch( ( error ) => {
 				dispatch( {
@@ -433,6 +483,27 @@ export function clearActivated( siteId ) {
 }
 
 /**
+ * Switches to the customizer to preview a given theme.
+ * If it's a Jetpack site, installs the theme prior to activation if it isn't already.
+ *
+ * @param  {String}   themeId   Theme ID
+ * @param  {Number}   siteId    Site ID
+ * @return {Function}           Action thunk
+ */
+export function tryAndCustomize( themeId, siteId ) {
+	return ( dispatch, getState ) => {
+		if ( isJetpackSite( getState(), siteId ) && ! getTheme( getState(), siteId, themeId ) ) {
+			const installId = suffixThemeIdForInstall( getState(), siteId, themeId );
+			// If theme is already installed, installation will silently fail,
+			// and we just switch to the customizer.
+			return dispatch( installAndTryAndCustomizeTheme( installId, siteId ) );
+		}
+
+		return dispatch( tryAndCustomizeTheme( themeId, siteId ) );
+	};
+}
+
+/**
  * Triggers a network request to install theme on Jetpack site.
  * After installataion it switches page to the customizer
  * See installTheme doc for install options.
@@ -442,11 +513,11 @@ export function clearActivated( siteId ) {
  * @param  {String}   siteId       Jetpack Site ID
  * @return {Function}              Action thunk
  */
-export function installAndTryAndCustomize( themeId, siteId ) {
+export function installAndTryAndCustomizeTheme( themeId, siteId ) {
 	return ( dispatch ) => {
 		return dispatch( installTheme( themeId, siteId ) )
 			.then( () => {
-				dispatch( tryAndCustomize( themeId, siteId ) );
+				dispatch( tryAndCustomizeTheme( themeId, siteId ) );
 			} );
 	};
 }
@@ -460,19 +531,9 @@ export function installAndTryAndCustomize( themeId, siteId ) {
  * @param  {String}   siteId       Jetpack Site ID
  * @return {Function}              Action thunk
  */
-export function tryAndCustomize( themeId, siteId ) {
+export function tryAndCustomizeTheme( themeId, siteId ) {
 	return ( dispatch, getState ) => {
-		const theme = getTheme( getState(), siteId, themeId );
-		if ( ! theme ) {
-			dispatch( {
-				type: THEME_TRY_AND_CUSTOMIZE_FAILURE,
-				themeId,
-				siteId
-			} );
-			return;
-		}
-		const url = getThemeCustomizeUrl( getState(), theme, siteId );
-		page( url );
+		page( getThemeCustomizeUrl( getState(), themeId, siteId ) );
 	};
 }
 
@@ -487,7 +548,7 @@ export function tryAndCustomize( themeId, siteId ) {
  * @param  {Boolean}  purchased Whether the theme has been purchased prior to activation
  * @return {Function}           Action thunk
  */
-export function installAndActivate( themeId, siteId, source = 'unknown', purchased = false ) {
+export function installAndActivateTheme( themeId, siteId, source = 'unknown', purchased = false ) {
 	return ( dispatch ) => {
 		return dispatch( installTheme( themeId, siteId ) )
 			.then( () => {
@@ -710,16 +771,46 @@ export function confirmDelete( themeId, siteId ) {
 		accept(
 			i18n.translate(
 				'Are you sure you want to delete %(themeName)s from %(siteTitle)s?',
-				{ args: { themeName, siteTitle }, context: 'Themes: theme delete confirmation dialog' }
+				{ args: { themeName, siteTitle }, comment: 'Themes: theme delete confirmation dialog' }
 			),
 			( accepted ) => {
 				accepted && dispatch( deleteTheme( themeId, siteId ) );
 			},
 			i18n.translate(
 				'Delete %(themeName)s',
-				{ args: { themeName }, context: 'Themes: theme delete dialog confirm button' }
+				{ args: { themeName }, comment: 'Themes: theme delete dialog confirm button' }
 			),
-			i18n.translate( 'Back', { context: 'Theme: theme delete dialog back button' } )
+			i18n.translate( 'Back', { context: 'go back (like the back button in a browser)' } )
 		);
 	};
+}
+
+export function setThemePreviewOptions( primary, secondary ) {
+	return {
+		type: THEME_PREVIEW_OPTIONS,
+		primary,
+		secondary
+	};
+}
+
+export function showThemePreview( themeId ) {
+	return {
+		type: THEME_PREVIEW_STATE,
+		themeId
+	};
+}
+
+export function hideThemePreview() {
+	return {
+		type: THEME_PREVIEW_STATE,
+		themeId: null
+	};
+}
+
+function suffixThemeIdForInstall( state, siteId, themeId ) {
+	// AT sites do not use the -wpcom suffix
+	if ( isSiteAutomatedTransfer( state, siteId ) ) {
+		return themeId;
+	}
+	return themeId + '-wpcom';
 }

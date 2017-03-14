@@ -16,6 +16,7 @@ import { getEditedPost } from 'state/posts/selectors';
 import { getPostType } from 'state/post-types/selectors';
 import QueryPostTypes from 'components/data/query-post-types';
 import { setLayoutFocus } from 'state/ui/layout-focus/actions';
+import { isMobile } from 'lib/viewport';
 
 export class EditorNotice extends Component {
 	static propTypes = {
@@ -33,8 +34,8 @@ export class EditorNotice extends Component {
 	}
 
 	componentWillReceiveProps( nextProps ) {
-		if ( ( ! this.props.message && nextProps.message ) ||
-			( ! this.props.error && nextProps.error ) ) {
+		if ( isMobile() &&
+			( ( ! this.props.message && nextProps.message ) || ( ! this.props.error && nextProps.error ) ) ) {
 			// If we are showing a notice that didn't exist before, switch to the main editor view to show it
 			this.props.setLayoutFocus( 'content' );
 		}
@@ -56,6 +57,8 @@ export class EditorNotice extends Component {
 		const { translate, type, typeObject, site } = this.props;
 
 		switch ( key ) {
+			case 'warnPublishDateChange':
+				return translate( 'Are you sure about that? If you change the date, existing links to your post will stop working.' );
 			case 'publishFailure':
 				if ( 'page' === type ) {
 					return translate( 'Publishing of page failed.' );
@@ -199,7 +202,7 @@ export class EditorNotice extends Component {
 				{ text && (
 					<Notice
 						{ ...{ status, text, onDismissClick } }
-						showDismiss={ 'is-success' !== status }>
+						showDismiss={ true }>
 						{ link && (
 							<NoticeAction href={ link } external>
 								{ this.getText( action ) }

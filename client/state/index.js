@@ -53,12 +53,11 @@ import stats from './stats/reducer';
 import storedCards from './stored-cards/reducer';
 import support from './support/reducer';
 import terms from './terms/reducer';
+import timezones from './timezones/reducer';
 import themes from './themes/reducer';
 import ui from './ui/reducer';
 import users from './users/reducer';
 import wordads from './wordads/reducer';
-import automatedTransferEnhancer from './automated-transfer/enhancer';
-import config from 'config';
 
 /**
  * Module variables
@@ -107,32 +106,29 @@ export const reducer = combineReducers( {
 	storedCards,
 	support,
 	terms,
+	timezones,
 	themes,
 	ui,
 	users,
 	wordads,
 } );
 
-// TEMPORARY AT FLOW FIX, NOT INTENDED FOR PROD
-const isDevOrWPCalypso = [ 'development', 'wpcalypso' ].indexOf( config( 'env_id' ) ) > -1;
-const atEnabled = isDevOrWPCalypso && config.isEnabled( 'automated-transfer' );
-
 export function createReduxStore( initialState = {} ) {
 	const isBrowser = typeof window === 'object';
+	const isAudioSupported = typeof window === 'object' && typeof window.Audio === 'function';
 
 	const middlewares = [
 		thunkMiddleware,
 		noticesMiddleware,
 		isBrowser && require( './analytics/middleware.js' ).analyticsMiddleware,
 		isBrowser && require( './data-layer/wpcom-api-middleware.js' ).default,
-		isBrowser && atEnabled && require( './automated-transfer/middleware.js' ).default
+		isAudioSupported && require( './audio/middleware.js' ).default,
 	].filter( Boolean );
 
 	const enhancers = [
 		isBrowser && window.app && window.app.isDebug && consoleDispatcher,
 		applyMiddleware( ...middlewares ),
 		isBrowser && sitesSync,
-		isBrowser && atEnabled && automatedTransferEnhancer,
 		isBrowser && window.devToolsExtension && window.devToolsExtension()
 	].filter( Boolean );
 

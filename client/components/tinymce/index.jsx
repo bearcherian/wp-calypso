@@ -32,6 +32,7 @@ import wplinkPlugin from './plugins/wplink/plugin.js';
 import mediaPlugin from './plugins/media/plugin';
 import advancedPlugin from './plugins/advanced/plugin';
 import wpcomTabindexPlugin from './plugins/wpcom-tabindex/plugin';
+import wpcomTrackPaste from './plugins/wpcom-track-paste/plugin';
 import touchScrollToolbarPlugin from './plugins/touch-scroll-toolbar/plugin';
 import editorButtonAnalyticsPlugin from './plugins/editor-button-analytics/plugin';
 import calypsoAlertPlugin from './plugins/calypso-alert/plugin';
@@ -42,6 +43,7 @@ import toolbarPinPlugin from './plugins/toolbar-pin/plugin';
 import insertMenuPlugin from './plugins/insert-menu/plugin';
 import embedReversalPlugin from './plugins/embed-reversal/plugin';
 import EditorHtmlToolbar from 'post-editor/editor-html-toolbar';
+import mentionsPlugin from './plugins/mentions/plugin';
 
 [
 	wpcomPlugin,
@@ -56,6 +58,7 @@ import EditorHtmlToolbar from 'post-editor/editor-html-toolbar';
 	mediaPlugin,
 	advancedPlugin,
 	wpcomTabindexPlugin,
+	wpcomTrackPaste,
 	touchScrollToolbarPlugin,
 	editorButtonAnalyticsPlugin,
 	calypsoAlertPlugin,
@@ -63,7 +66,7 @@ import EditorHtmlToolbar from 'post-editor/editor-html-toolbar';
 	afterTheDeadlinePlugin,
 	wptextpatternPlugin,
 	toolbarPinPlugin,
-	embedReversalPlugin
+	embedReversalPlugin,
 ].forEach( ( initializePlugin ) => initializePlugin() );
 
 /**
@@ -128,11 +131,17 @@ const PLUGINS = [
 	'wpcom/toolbarpin',
 	'wpcom/contactform',
 	'wpcom/sourcecode',
-	'wpcom/embedreversal'
+	'wpcom/embedreversal',
+	'wpcom/trackpaste',
 ];
 
 if ( config.isEnabled( 'post-editor/insert-menu' ) ) {
 	PLUGINS.push( 'wpcom/insertmenu' );
+}
+
+if ( config.isEnabled( 'post-editor/mentions' ) ) {
+	mentionsPlugin();
+	PLUGINS.push( 'wpcom/mentions' );
 }
 
 const CONTENT_CSS = [
@@ -377,7 +386,11 @@ module.exports = React.createClass( {
 
 			// Collapse selection to avoid scrolling to the bottom of the textarea
 			textNode.setSelectionRange( 0, 0 );
-			textNode.focus();
+
+			// Browser is not Internet Explorer 11
+			if ( 11 !== tinymce.Env.ie ) {
+				textNode.focus();
+			}
 		} else if ( this._editor ) {
 			this._editor.focus();
 		}
@@ -475,7 +488,7 @@ module.exports = React.createClass( {
 
 		return (
 			<div>
-				{ mode === 'html' &&
+				{ 'html' === mode && config.isEnabled( 'post-editor/html-toolbar' ) &&
 					<EditorHtmlToolbar
 						content={ this.refs.text }
 						onToolbarChangeContent={ this.onToolbarChangeContent }

@@ -46,6 +46,7 @@ import DocumentHead from 'components/data/document-head';
 import { translate } from 'i18n-calypso';
 import SignupActions from 'lib/signup/actions';
 import { recordSignupStart, recordSignupCompletion } from 'lib/analytics/ad-tracking';
+import { disableCart } from 'lib/upgrades/actions';
 
 /**
  * Constants
@@ -122,6 +123,11 @@ const Signup = React.createClass( {
 			ref: this.props.refParameter
 		} );
 		recordSignupStart();
+
+		// Signup updates the cart through `SignupCart`. To prevent
+		// synchronization issues and unnecessary polling, the cart is disabled
+		// here.
+		disableCart();
 
 		this.submitQueryDependencies();
 
@@ -345,9 +351,17 @@ const Signup = React.createClass( {
 	},
 
 	goToFirstInvalidStep() {
-		var firstInvalidStep = find( SignupProgressStore.get(), { status: 'invalid' } );
+		const firstInvalidStep = find( SignupProgressStore.get(), { status: 'invalid' } );
 
 		if ( firstInvalidStep ) {
+			if ( firstInvalidStep.stepName === this.props.stepName ) {
+				// reset the signup stores so we have a chance to start over the flow
+				// TODO: fix loading invalid steps from the store
+				SignupDependencyStore.reset();
+				SignupProgressStore.reset();
+				console.error( 'Current step is invalid, cannot redirect to it.', firstInvalidStep.errors ); //eslint-disable-line no-console
+				return;
+			}
 			analytics.tracks.recordEvent( 'calypso_signup_goto_invalid_step', {
 				step: firstInvalidStep.stepName,
 				flow: this.props.flowName

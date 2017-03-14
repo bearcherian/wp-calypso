@@ -35,6 +35,7 @@ import SegmentedControl from 'components/segmented-control';
 import SegmentedControlItem from 'components/segmented-control/item';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import { getCurrentPlan } from 'state/sites/plans/selectors';
+import isSiteAutomatedTransfer from 'state/selectors/is-site-automated-transfer';
 
 class PlanFeaturesHeader extends Component {
 
@@ -72,19 +73,28 @@ class PlanFeaturesHeader extends Component {
 
 	getBillingTimeframe() {
 		const {
+			hideMonthly,
 			billingTimeFrame,
 			discountPrice,
 			isPlaceholder,
 			site,
 			translate,
+			isSiteAT,
+			currentSitePlan
 		} = this.props;
+
 		const isDiscounted = !! discountPrice;
 		const timeframeClasses = classNames( 'plan-features__header-timeframe', {
 			'is-discounted': isDiscounted,
 			'is-placeholder': isPlaceholder
 		} );
 
-		if ( ! site.jetpack || this.props.planType === PLAN_JETPACK_FREE ) {
+		if (
+			isSiteAT ||
+			! site.jetpack ||
+			this.props.planType === PLAN_JETPACK_FREE ||
+			( hideMonthly && ( ! currentSitePlan || currentSitePlan.productSlug === PLAN_JETPACK_FREE ) )
+		) {
 			return (
 				<p className={ timeframeClasses }>
 					{ ! isPlaceholder ? billingTimeFrame : '' }
@@ -158,6 +168,7 @@ class PlanFeaturesHeader extends Component {
 
 	getPlanFeaturesPrices() {
 		const {
+			hideMonthly,
 			currencyCode,
 			discountPrice,
 			rawPrice,
@@ -177,7 +188,6 @@ class PlanFeaturesHeader extends Component {
 				<div className={ classes } ></div>
 			);
 		}
-
 		if ( discountPrice ) {
 			return (
 				<span className="plan-features__header-price-group">
@@ -187,7 +197,7 @@ class PlanFeaturesHeader extends Component {
 			);
 		}
 
-		if ( relatedMonthlyPlan ) {
+		if ( relatedMonthlyPlan && ! hideMonthly ) {
 			const originalPrice = relatedMonthlyPlan.raw_price * 12;
 			return (
 				<span className="plan-features__header-price-group">
@@ -232,7 +242,8 @@ PlanFeaturesHeader.propTypes = {
 	site: PropTypes.object,
 	isInJetpackConnect: PropTypes.bool,
 	currentSitePlan: PropTypes.object,
-	relatedMonthlyPlan: PropTypes.object
+	relatedMonthlyPlan: PropTypes.object,
+	isSiteAT: PropTypes.bool
 };
 
 PlanFeaturesHeader.defaultProps = {
@@ -244,16 +255,19 @@ PlanFeaturesHeader.defaultProps = {
 	intervalType: 'yearly',
 	site: {},
 	basePlansPath: null,
-	currentSitePlan: {}
+	currentSitePlan: {},
+	isSiteAT: false
 };
 
 export default connect( ( state, ownProps ) => {
 	const { isInSignup } = ownProps;
 	const selectedSiteId = isInSignup ? null : getSelectedSiteId( state );
 	const currentSitePlan = getCurrentPlan( state, selectedSiteId );
-
 	return Object.assign( {},
 		ownProps,
-		{ currentSitePlan }
+		{
+			currentSitePlan,
+			isSiteAT: isSiteAutomatedTransfer( state, selectedSiteId )
+		}
 	);
 } )( localize( PlanFeaturesHeader ) );

@@ -6,7 +6,6 @@ import ReactDom from 'react-dom';
 import React from 'react';
 import i18n from 'i18n-calypso';
 import { uniq } from 'lodash';
-import startsWith from 'lodash/startsWith';
 
 /**
  * Internal Dependencies
@@ -31,7 +30,22 @@ import utils from 'lib/site/utils';
 import { setLayoutFocus } from 'state/ui/layout-focus/actions';
 import { renderWithReduxStore } from 'lib/react-helpers';
 import isDomainOnlySite from 'state/selectors/is-domain-only-site';
-import { domainManagementList } from 'my-sites/upgrades/paths';
+import {
+	domainManagementAddGoogleApps,
+	domainManagementContactsPrivacy,
+	domainManagementDns,
+	domainManagementEdit,
+	domainManagementEditContactInfo,
+	domainManagementEmail,
+	domainManagementEmailForwarding,
+	domainManagementList,
+	domainManagementNameServers,
+	domainManagementPrivacyProtection,
+	domainManagementRedirectSettings,
+	domainManagementTransfer,
+	domainManagementTransferOut,
+	domainManagementTransferToAnotherUser
+} from 'my-sites/upgrades/paths';
 import SitesComponent from 'my-sites/sites';
 
 /**
@@ -113,37 +127,71 @@ function renderNoVisibleSites( context ) {
 	);
 }
 
-function isPathAllowedForDomainOnlySite( pathname, domainName ) {
-	const urlPrefixesWhiteListForDomainOnlySite = [
-		domainManagementList( domainName ),
-		'/checkout/',
+function renderSelectedSiteIsDomainOnly( reactContext, selectedSite ) {
+	const FeatureUnavailable = require( 'components/empty-content/feature-unavailable' );
+	const { store: reduxStore } = reactContext;
+
+	renderWithReduxStore( (
+			<FeatureUnavailable domainName={ selectedSite.slug } siteId={ selectedSite.ID } />
+		),
+		document.getElementById( 'primary' ),
+		reduxStore
+	);
+
+	renderWithReduxStore(
+		createNavigation( reactContext ),
+		document.getElementById( 'secondary' ),
+		reduxStore
+	);
+}
+
+function isPathAllowedForDomainOnlySite( path, domainName ) {
+	const domainManagementPaths = [
+		domainManagementAddGoogleApps,
+		domainManagementContactsPrivacy,
+		domainManagementDns,
+		domainManagementEdit,
+		domainManagementEditContactInfo,
+		domainManagementEmail,
+		domainManagementEmailForwarding,
+		domainManagementList,
+		domainManagementNameServers,
+		domainManagementPrivacyProtection,
+		domainManagementRedirectSettings,
+		domainManagementTransfer,
+		domainManagementTransferOut,
+		domainManagementTransferToAnotherUser
+	].map( pathFactory => pathFactory( domainName, domainName ) );
+
+	const otherPaths = [
+		`/checkout/${ domainName }`
 	];
 
-	return urlPrefixesWhiteListForDomainOnlySite.some( path => startsWith( pathname, path ) );
+	return [ ...domainManagementPaths, ...otherPaths ].indexOf( path ) > -1;
 }
 
 function onSelectedSiteAvailable( context ) {
 	const selectedSite = sites.getSelectedSite();
-	const state = context.store.getState();
+	const getState = () => context.store.getState();
 
 	// Currently, sites are only made available in Redux state by the receive
 	// here (i.e. only selected sites). If a site is already known in state,
 	// avoid receiving since we risk overriding changes made more recently.
-	if ( ! getSite( state, selectedSite.ID ) ) {
+	if ( ! getSite( getState(), selectedSite.ID ) ) {
 		context.store.dispatch( receiveSite( selectedSite ) );
 	}
 
 	context.store.dispatch( setSelectedSiteId( selectedSite.ID ) );
 
-	if ( isDomainOnlySite( state, selectedSite.ID ) &&
+	if ( isDomainOnlySite( getState(), selectedSite.ID ) &&
 		! isPathAllowedForDomainOnlySite( context.pathname, selectedSite.slug ) ) {
-		page.redirect( domainManagementList( selectedSite.slug ) );
+		renderSelectedSiteIsDomainOnly( context, selectedSite );
 		return false;
 	}
 
 	// Update recent sites preference
-	if ( hasReceivedRemotePreferences( state ) ) {
-		const recentSites = getPreference( state, 'recentSites' );
+	if ( hasReceivedRemotePreferences( getState() ) ) {
+		const recentSites = getPreference( getState(), 'recentSites' );
 		if ( selectedSite.ID !== recentSites[ 0 ] ) {
 			context.store.dispatch( savePreference( 'recentSites', uniq( [
 				selectedSite.ID,
@@ -346,7 +394,7 @@ module.exports = {
 		const basePath = route.sectionify( context.path );
 		const selectedSite = sites.getSelectedSite();
 
-		if ( selectedSite && selectedSite.jetpack ) {
+		if ( selectedSite && selectedSite.jetpack && ! ( config.isEnabled( 'automated-transfer' ) ) ) {
 			renderWithReduxStore( (
 				<Main>
 					<JetpackManageErrorPage

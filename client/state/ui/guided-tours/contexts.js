@@ -1,6 +1,8 @@
 /**
  * Internal dependencies
  */
+import { EDITOR_PASTE_EVENT } from 'state/action-types';
+import { SOURCE_GOOGLE_DOCS } from 'components/tinymce/plugins/wpcom-track-paste/sources';
 import config from 'config';
 import { abtest } from 'lib/abtest';
 import {
@@ -11,7 +13,10 @@ import {
 import { getLastAction } from 'state/ui/action-log/selectors';
 import { getCurrentUser } from 'state/current-user/selectors';
 import { canCurrentUser } from 'state/selectors';
-import { hasDefaultSiteTitle } from 'state/sites/selectors';
+import {
+	hasDefaultSiteTitle,
+	isCurrentPlanPaid,
+} from 'state/sites/selectors';
 
 const WEEK_IN_MILLISECONDS = 7 * 1000 * 3600 * 24;
 
@@ -130,6 +135,28 @@ export const isAbTestInVariant = ( testName, variant ) => () =>
 export const hasSelectedSiteDefaultSiteTitle = state => {
 	const siteId = getSelectedSiteId( state );
 	return siteId ? hasDefaultSiteTitle( state, siteId ) : false;
+};
+
+/**
+ * Returns true if the selected site has a paid plan
+ *
+ * @param {Object} state Global state tree
+ * @return {Boolean} True if selected site is on a paid plan, false otherwise.
+ */
+export const isSelectedSitePlanPaid = state => {
+	const siteId = getSelectedSiteId( state );
+	return siteId ? isCurrentPlanPaid( state, siteId ) : false;
+};
+
+/**
+ * Returns true if user has just pasted something from Google Docs.
+ *
+ * @param {Object} state Global state tree
+ * @return {Boolean} True if user has just pasted something from Google Docs, false otherwise.
+ */
+export const hasUserPastedFromGoogleDocs = state => {
+	const action = getLastAction( state ) || false;
+	return action && ( action.type === EDITOR_PASTE_EVENT ) && ( action.source === SOURCE_GOOGLE_DOCS );
 };
 
 /**

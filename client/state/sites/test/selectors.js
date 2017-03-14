@@ -1735,7 +1735,7 @@ describe( 'selectors', () => {
 			expect( hasThemesExtendedFeatures ).to.be.null;
 		} );
 
-		it( 'it should return `false` if jetpack version is smaller than 4.4.2', () => {
+		it( 'it should return `false` if jetpack version is smaller than 4.7', () => {
 			const state = createStateWithItems( {
 				[ siteId ]: {
 					ID: siteId,
@@ -1751,14 +1751,14 @@ describe( 'selectors', () => {
 			expect( hasThemesExtendedFeatures ).to.be.false;
 		} );
 
-		it( 'it should return `true` if jetpack version is greater or equal to 4.4.2', () => {
+		it( 'it should return `true` if jetpack version is greater or equal to 4.7', () => {
 			const state = createStateWithItems( {
 				[ siteId ]: {
 					ID: siteId,
 					URL: 'https://jetpacksite.me',
 					jetpack: true,
 					options: {
-						jetpack_version: '4.4.2'
+						jetpack_version: '4.7'
 					}
 				}
 			} );
@@ -2226,14 +2226,14 @@ describe( 'selectors', () => {
 	} );
 
 	describe( 'getCustomizerUrl()', () => {
-		it( 'should return null if slug for WordPress.com site is not known', () => {
+		it( 'should return root path if slug for WordPress.com site is not known', () => {
 			const customizerUrl = getCustomizerUrl( {
 				sites: {
 					items: {}
 				}
 			}, 77203199 );
 
-			expect( customizerUrl ).to.be.null;
+			expect( customizerUrl ).to.equal( '/customize' );
 		} );
 
 		it( 'should return customizer URL for WordPress.com site', () => {
@@ -2268,9 +2268,67 @@ describe( 'selectors', () => {
 			expect( customizerUrl ).to.be.null;
 		} );
 
+		it( 'should return customizer URL for Jetpack site', () => {
+			const customizerUrl = getCustomizerUrl( {
+				sites: {
+					items: {
+						77203199: {
+							ID: 77203199,
+							URL: 'https://example.com',
+							jetpack: true,
+							options: {
+								admin_url: 'https://example.com/wp-admin/'
+							}
+						}
+					}
+				}
+			}, 77203199 );
+
+			expect( customizerUrl ).to.equal( 'https://example.com/wp-admin/customize.php' );
+		} );
+
+		it( 'should prepend panel path parameter for WordPress.com site', () => {
+			const customizerUrl = getCustomizerUrl( {
+				sites: {
+					items: {
+						77203199: {
+							ID: 77203199,
+							URL: 'https://example.com',
+							jetpack: false
+						}
+					}
+				}
+			}, 77203199, 'identity' );
+
+			expect( customizerUrl ).to.equal( '/customize/identity/example.com' );
+		} );
+
+		it( 'should prepend panel path parameter for Jetpack site', () => {
+			const customizerUrl = getCustomizerUrl( {
+				sites: {
+					items: {
+						77203199: {
+							ID: 77203199,
+							URL: 'https://example.com',
+							jetpack: true,
+							options: {
+								admin_url: 'https://example.com/wp-admin/'
+							}
+						}
+					}
+				}
+			}, 77203199, 'identity' );
+
+			expect( customizerUrl ).to.equal( 'https://example.com/wp-admin/customize.php?autofocus%5Bsection%5D=title_tagline' );
+		} );
+
 		context( 'browser', () => {
 			before( () => {
-				global.window = { location: 'https://wordpress.com' };
+				global.window = {
+					location: {
+						href: 'https://wordpress.com'
+					}
+				};
 			} );
 
 			after( () => {
@@ -2293,7 +2351,7 @@ describe( 'selectors', () => {
 					}
 				}, 77203199 );
 
-				expect( customizerUrl ).to.equal( 'https://example.com/wp-admin/customize.php?return=https%253A%252F%252Fwordpress.com' );
+				expect( customizerUrl ).to.equal( 'https://example.com/wp-admin/customize.php?return=https%3A%2F%2Fwordpress.com' );
 			} );
 		} );
 

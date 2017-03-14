@@ -62,13 +62,17 @@
 		}
 	}
 
+	.form-toggle__switch {
+		margin-top: 3px;
+	}
+
 	p.form-setting-explanation {
 		display: block;
 		margin: 5px 0;
 		font-size: 13px;
 		font-style: italic;
 		font-weight: 400;
-		color: $gray;
+		color: $gray-text-min;
 		&.is-indented {
 			margin-left: 24px;
 		}
@@ -127,10 +131,6 @@
 		}
 	}
 
-	.seo-settings__seo-form .section-header {
-		margin-top: 32px;
-	}
-
 	.seo-settings__seo-form .seo-settings__preview-button {
 		display: block;
 		float: left;
@@ -141,6 +141,10 @@
 		display: block;
 		float: left;
 		line-height: 40px;
+	}
+
+	.seo-settings__front-page-description {
+		margin-bottom: 1.5em;
 	}
 
 	fieldset.site-icon-setting {
@@ -172,13 +176,11 @@
 			margin-bottom: 8px;
 		}
 	}
-
-	.site-settings__child-settings {
-		margin-left: 36px;
-	}
 }
 
-.site-settings__general-settings, .site-settings__writing-settings {
+.site-settings__general-settings,
+.site-settings__writing-settings,
+.site-settings__security-settings {
 	.form-toggle__label {
 		display: flex;
 		align-items: center;
@@ -188,21 +190,12 @@
 		flex: 1 0 auto;
 	}
 
-	.site-settings__toggle-label {
-		flex: 0 1 100%;
-		margin-left: 12px;
-	}
-
 	hr {
 		margin: 0 -24px 1.5em;
 	}
 }
 
 .site-settings__discussion-settings {
-	label:first-of-type {
-		font-weight: normal;
-	}
-
 	.form-toggle__label {
 		display: flex;
 		align-items: center;
@@ -236,6 +229,12 @@
 
 		.form-select {
 			margin-top: 2px;
+		}
+	}
+
+	.site-settings__moderation-settings {
+		.form-label {
+			font-weight: normal;
 		}
 	}
 }
@@ -294,95 +293,11 @@
 	}
 }
 
-.site-settings__custom-post-type .form-toggle__label {
-	margin-bottom: 0;
-}
-
-.site-settings .site-settings__custom-post-type p.form-setting-explanation {
-	margin: 0 0 16px;
-}
-
-.site-settings__custom-post-type-fieldset .feature-example__content {
-	box-sizing: border-box;
-	padding: 1px; // Example overflow is hidden, obscuring border effect from box-shadow
-}
-
-.site-settings__custom-post-type-fieldset .feature-example__gradient {
-	background: linear-gradient( to bottom, rgba( $white, 0.4 ), rgba( $white, 1 ) );
-}
-
-#settings-reading-relatedposts-preview .form-label {
-	font-weight: 600;
-	margin-top: 16px;
-}
-
-.site-settings__related-posts {
-	position: relative;
-	margin-top: 8px;
-	padding: 16px 8px;
-	width: 100%;
-	background: $gray-light;
-	box-sizing: border-box;
-
-	@include clear-fix;
-
-	.site-settings__related-posts-headline {
- 		margin: 0 0 1em 8px;
- 		font-size: 11px;
- 		font-weight: 600;
- 	}
-
-	.site-settings__related-posts-items {
-
-
-		@include breakpoint( ">480px" ) {
-			display: flex;
-			flex-wrap: wrap;
-			.site-settings__related-posts-post {
-				width: 50%;
-			}
-		}
-
-		@include breakpoint( ">960px" ) {
-			flex-wrap: nowrap;
-		}
-	}
-
-	.site-settings__related-posts-post .site-settings__related-posts-post-title a {
-		font-weight: normal;
-		text-decoration: none;
-		opacity: 1;
-	}
-
-	.site-settings__related-posts-post {
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0 8px;
-	}
-
-	.site-settings__related-posts-post span {
-		display: block;
-		max-width: 90%;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.site-settings__related-posts-post .site-settings__related-posts-post-context {
-		opacity: .6;
-	}
-
-	.site-settings__related-posts-post-a {
-		cursor: pointer;
-	}
-}
-
 .jetpack-protect__deactivate,
 .jetpack-protect__edit-settings,
-.jetpack-scan__deactivate,
 .jetpack-monitor__deactivate,
 .disconnect-jetpack-button,
 .jetpack-protect__edit-settings,
-.jetpack-scan__deactivate,
 .jetpack-monitor__deactivate,
 .disconnect-jetpack-button {
 	margin-right: 8px;
@@ -417,4 +332,40 @@
 
 .site-settings__taxonomies {
 	margin-bottom: 17px;
+}
+
+// Site settings group styles
+.site-settings__module-settings {
+	.form-label {
+		&.is-disabled {
+			opacity: 0.3;
+		}
+	}
+}
+
+.site-settings__child-settings {
+	margin: 16px 36px 0;
+}
+
+.site-settings__info-link-container {
+	float: right;
+}
+
+.site-settings__date-time-format-custom {
+	.form-radio {
+		display: none;
+		margin-top: 12px;
+	}
+	&.is-custom .form-radio {
+		display: block;
+	}
+
+	.form-text-input {
+		margin: 0 12px;
+		width: 100px;
+	}
+
+	.site-settings__date-time-format-custom-preview {
+		white-space: nowrap;
+	}
 }

@@ -18,6 +18,7 @@ import mediaStorage from './media-storage/reducer';
 import {
 	MEDIA_DELETE,
 	SITE_FRONT_PAGE_SET_SUCCESS,
+	SITE_DELETE_RECEIVE,
 	SITE_RECEIVE,
 	SITE_REQUEST,
 	SITE_REQUEST_FAILURE,
@@ -32,12 +33,9 @@ import {
 	DESERIALIZE,
 	THEME_ACTIVATE_REQUEST_SUCCESS,
 	WORDADS_SITE_APPROVE_REQUEST_SUCCESS,
-	PRESSABLE_TRANSFER_START,
-	PRESSABLE_TRANSFER_SUCCESS,
 } from 'state/action-types';
 import { sitesSchema } from './schema';
 import { isValidStateWithSchema, createReducer } from 'state/utils';
-import { PRESSABLE_STATE_TRANSFERED, PRESSABLE_STATE_IN_TRANSFER } from './constants';
 
 /**
  * Constants
@@ -79,26 +77,6 @@ export function items( state = {}, action ) {
 			}
 			return state;
 
-		case PRESSABLE_TRANSFER_START: {
-			const originalSite = state[ action.siteId ];
-			if ( originalSite ) {
-				return Object.assign( {}, state, {
-					[ action.siteId ]: merge( {}, originalSite, { jetpack: true, options: { pressable: PRESSABLE_STATE_IN_TRANSFER } } )
-				} );
-			}
-			return state;
-		}
-
-		case PRESSABLE_TRANSFER_SUCCESS: {
-			const originalSite = state[ action.siteId ];
-			if ( originalSite ) {
-				return Object.assign( {}, state, {
-					[ action.siteId ]: merge( {}, originalSite, { jetpack: true, options: { pressable: PRESSABLE_STATE_TRANSFERED } } )
-				} );
-			}
-			return state;
-		}
-
 		case SITE_RECEIVE:
 		case SITES_RECEIVE:
 		case SITES_UPDATE:
@@ -134,6 +112,9 @@ export function items( state = {}, action ) {
 				return memo;
 			}, initialNextState );
 
+		case SITE_DELETE_RECEIVE:
+			return omit( state, action.site.ID );
+
 		case THEME_ACTIVATE_REQUEST_SUCCESS: {
 			const { siteId, themeStylesheet } = action;
 			const site = state[ siteId ];
@@ -167,7 +148,8 @@ export function items( state = {}, action ) {
 			// accounting for the fact that a non-existent icon property is
 			// equivalent to setting the media icon as null
 			const site = state[ siteId ];
-			if ( ! site || get( site.icon, 'media_id', null ) === mediaId ) {
+			if ( ! site || ( ! site.icon && null === mediaId ) ||
+					( site.icon && site.icon.media_id === mediaId ) ) {
 				return state;
 			}
 

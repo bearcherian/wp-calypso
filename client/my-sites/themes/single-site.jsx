@@ -36,8 +36,8 @@ const SingleSiteThemeShowcaseWithOptions = ( props ) => {
 				siteId={ site.ID }
 				options={ [
 					'customize',
-					'preview',
 					'purchase',
+					'preview',
 					'activate',
 					'tryandcustomize',
 					'deleteTheme',
@@ -83,7 +83,7 @@ export default connect(
 		return {
 			isJetpack: isJetpackSite( state, selectedSiteId ),
 			isCustomizable: canCurrentUser( state, selectedSiteId, 'edit_theme_options' ),
-			getScreenshotOption: ( theme ) => isThemeActive( state, theme.id, selectedSiteId ) ? 'customize' : 'info'
+			getScreenshotOption: ( themeId ) => isThemeActive( state, themeId, selectedSiteId ) ? 'customize' : 'info'
 		};
 	}
 )( localize( SingleSiteThemeShowcaseWithOptions ) );

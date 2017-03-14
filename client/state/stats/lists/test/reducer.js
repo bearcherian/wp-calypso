@@ -104,17 +104,19 @@ describe( 'reducer', () => {
 		} );
 
 		it( 'should track stats request success', () => {
+			const today = new Date();
 			const state = requests( undefined, {
 				type: SITE_STATS_REQUEST_SUCCESS,
 				siteId: 2916284,
 				statType: 'statsStreak',
-				query: streakQuery
+				query: streakQuery,
+				date: today
 			} );
 
 			expect( state ).to.eql( {
 				2916284: {
 					statsStreak: {
-						'[["endDate","2016-06-01"],["startDate","2015-06-01"]]': { requesting: false, status: 'success' }
+						'[["endDate","2016-06-01"],["startDate","2015-06-01"]]': { requesting: false, status: 'success', date: today }
 					}
 				}
 			} );
@@ -138,7 +140,7 @@ describe( 'reducer', () => {
 			} );
 		} );
 
-		it( 'should never persist state', () => {
+		it( 'should not persist state', () => {
 			const original = deepFreeze( {
 				2916284: {
 					statsStreak: {
@@ -152,7 +154,7 @@ describe( 'reducer', () => {
 			expect( state ).to.eql( {} );
 		} );
 
-		it( 'should never load persisted state', () => {
+		it( 'should not load persisted state', () => {
 			const original = deepFreeze( {
 				2916284: {
 					statsStreak: {

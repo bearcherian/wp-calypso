@@ -1,20 +1,4 @@
 module.exports = {
-	// `browserNotifications` controls whether or not users see the
-	// nudge notice to enable browser notifications at the top of
-	// some Calypso screens; any users with this enabled will also
-	// have the preference available in /me/notifications;
-	// note: not renaming this test at this point in time so that we don't
-	// mess with any users that were put in the `enabled` variation -- don't
-	// want to take their browser notifications preference away from them!
-	browserNotifications: {
-		datestamp: '20160628',
-		variations: {
-			disabled: 95,
-			enabled: 5,
-		},
-		defaultVariation: 'disabled',
-		allowExistingUsers: true,
-	},
 	multiDomainRegistrationV1: {
 		datestamp: '20200721',
 		variations: {
@@ -53,73 +37,15 @@ module.exports = {
 		defaultVariation: 'hideThemeUpload',
 		allowExistingUsers: false,
 	},
-	domainSuggestionPopover: {
-		datestamp: '20160809',
-		variations: {
-			showPopover: 80,
-			hidePopover: 20,
-		},
-		defaultVariation: 'showPopover',
-		allowExistingUsers: false,
-	},
-	designShowcaseWelcomeTour: {
-		datestamp: '20161206',
-		variations: {
-			enabled: 0,
-			disabled: 100,
-		},
-		defaultVariation: 'disabled',
-		allowExistingUsers: true,
-	},
-	themeSheetWelcomeTour: {
-		datestamp: '20161206',
-		variations: {
-			enabled: 0,
-			disabled: 100,
-		},
-		defaultVariation: 'disabled',
-		allowExistingUsers: true,
-	},
-	siteTitleStep: {
-		datestamp: '20170102',
-		variations: {
-			showSiteTitleStep: 5,
-			hideSiteTitleStep: 95,
-		},
-		defaultVariation: 'hideSiteTitleStep',
-		allowExistingUsers: false
-	},
-
-	jetpackConnectPlansFirst: {
-		datestamp: '20161024',
-		variations: {
-			showPlansBeforeAuth: 50,
-			showPlansAfterAuth: 50
-		},
-		defaultVariation: 'showPlansAfterAuth',
-		allowExistingUsers: true
-	},
-
-	siteTitleTour: {
-		datestamp: '20161207',
-		variations: {
-			disabled: 100,
-			enabled: 0,
-		},
-		defaultVariation: 'disabled',
-		allowExistingUsers: true,
-	},
-
 	userFirstSignup: {
 		datestamp: '20160124',
 		variations: {
-			userLast: 80,
-			userFirst: 20,
+			userLast: 100,
+			userFirst: 0,
 		},
 		defaultVariation: 'userLast',
 		allowExistingUsers: false,
 	},
-
 	premiumSquaredPlansWording: {
 		datestamp: '20170111',
 		variations: {
@@ -129,23 +55,29 @@ module.exports = {
 		defaultVariation: 'withoutMarketingCopy',
 		allowExistingUsers: true
 	},
-
-	jetpackPlansTabs: {
-		datestamp: '20170117',
+	jetpackPlansNoMonthly: {
+		datestamp: '20170302',
 		variations: {
-			tabs: 50,
-			noTabs: 50
+			showMonthly: 50,
+			hideMonthly: 50
 		},
-		defaultVariation: 'noTabs'
-	},
-
-	domainContactNewPhoneInput: {
-		datestamp: '20170123',
-		variations: {
-			disabled: 50,
-			enabled: 50
-		},
-		defaultVariation: 'disabled',
+		defaultVariation: 'showMonthly',
 		allowExistingUsers: true
-	}
+	},
+	signupDomainsHeadline: {
+		datestamp: '20170313',
+		variations: {
+			original: 50,
+			updated: 50
+		},
+		defaultVariation: 'original'
+	},
+	signupStepOneCopyChanges: {
+		datestamp: '20170307',
+		variations: {
+			original: 50,
+			modified: 50,
+		},
+		defaultVariation: 'original',
+	},
 };

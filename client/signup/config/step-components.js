@@ -13,18 +13,20 @@ var config = require( 'config' ),
 	SurveyStepComponent = require( 'signup/steps/survey' ),
 	ThemeSelectionComponent = require( 'signup/steps/theme-selection' );
 import UserSignupComponent from 'signup/steps/user';
+import PlansStepWithoutFreePlan from 'signup/steps/plans-without-free';
+
 
 module.exports = {
 	'design-type': DesignTypeComponent,
 	'design-type-with-store': DesignTypeWithStoreComponent,
 	domains: DomainsStepComponent,
-	'domains-with-plan': DomainsStepComponent,
 	'domain-only': DomainsStepComponent,
 	'domains-theme-preselected': DomainsStepComponent,
 	'jetpack-user': UserSignupComponent,
 	'get-dot-blog-plans': GetDotBlogPlansStepComponent,
 	'get-dot-blog-themes': ThemeSelectionComponent,
 	plans: PlansStepComponent,
+	'plans-site-selected': PlansStepWithoutFreePlan,
 	site: SiteComponent,
 	'site-or-domain': SiteOrDomainComponent,
 	'site-title': SiteTitleComponent,

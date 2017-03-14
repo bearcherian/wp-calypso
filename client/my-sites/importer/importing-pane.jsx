@@ -115,15 +115,8 @@ export const ImportingPane = React.createClass( {
 
 	getHeadingText: function() {
 		return this.translate(
-			'Importing may take a while, but you can ' +
-			'safely navigate away from this page if you need ' +
-			'to. If you {{b}}stop the import{{/b}}, your site ' +
-			'will be {{b2}}partially imported{{/b2}}.', {
-				components: {
-					b: <strong />,
-					b2: <strong />
-				}
-			}
+			'Importing takes 15 minutes or a while longer if your site has a lot of media. ' +
+			'You can safely navigate away from this page if you need to: we\'ll send you a notification when it\'s done.'
 		);
 	},
 
@@ -134,7 +127,10 @@ export const ImportingPane = React.createClass( {
 			postLink = <a href={ '/posts/' + slug } />,
 			postText = this.translate( 'Posts', { context: 'noun' } );
 
-		if ( page && post ) {
+		const pageCount = page.total;
+		const postCount = post.total;
+
+		if ( pageCount && postCount ) {
 			return this.translate(
 				'All done! Check out {{a}}Posts{{/a}} or ' +
 				'{{b}}Pages{{/b}} to see your imported content.', {
@@ -146,12 +142,12 @@ export const ImportingPane = React.createClass( {
 			);
 		}
 
-		if ( page || post ) {
+		if ( pageCount || postCount ) {
 			return this.translate(
 				'All done! Check out {{a}}%(articles)s{{/a}} ' +
 				'to see your imported content.', {
-					components: { a: page ? pageLink : postLink },
-					args: { articles: page ? pageText : postText }
+					components: { a: pageCount ? pageLink : postLink },
+					args: { articles: pageCount ? pageText : postText }
 				}
 			);
 		}

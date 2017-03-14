@@ -25,6 +25,7 @@ export function rangeOfPeriod( period, date ) {
 	if ( 'week' === period ) {
 		if ( '0' === momentDate.format( 'd' ) ) {
 			startOf.subtract( 6, 'd' );
+			endOf.subtract( 6, 'd' );
 		} else {
 			startOf.add( 1, 'd' );
 			endOf.add( 1, 'd' );
@@ -34,6 +35,23 @@ export function rangeOfPeriod( period, date ) {
 		startOf: startOf.format( 'YYYY-MM-DD' ),
 		endOf: endOf.format( 'YYYY-MM-DD' )
 	};
+}
+
+/**
+ * Returns true if is auto refreshing astats is allowed
+ * for the give stats query
+ * It's allowed for queries without dates and for periods including today
+ *
+ * @param  {String} query  Stats query
+ * @return {Boolean}       AutoRefresh allowed or not
+ */
+export function isAutoRefreshAllowedForQuery( query ) {
+	if ( ! query || ! query.date || ( ! query.unit && ! query.period ) ) {
+		return true;
+	}
+	const range = rangeOfPeriod( query.period || query.unit, query.date );
+	const today = moment();
+	return today >= moment( range.startOf ) && today < moment( range.endOf ).add( 1, 'day' );
 }
 
 /**
@@ -116,7 +134,8 @@ export const normalizers = {
 			highest_hour,
 			highest_day_percent,
 			highest_day_of_week,
-			highest_hour_percent
+			highest_hour_percent,
+			hourly_views,
 		} = data;
 
 		// Adjust Day of Week from 0 = Monday to 0 = Sunday (for Moment)
@@ -129,7 +148,8 @@ export const normalizers = {
 			day: moment().day( dayOfWeek ).format( 'dddd' ),
 			percent: Math.round( highest_day_percent ),
 			hour: moment().hour( highest_hour ).startOf( 'hour' ).format( 'LT' ),
-			hourPercent: Math.round( highest_hour_percent )
+			hourPercent: Math.round( highest_hour_percent ),
+			hourlyViews: hourly_views,
 		};
 	},
 
@@ -207,14 +227,14 @@ export const normalizers = {
 
 		return map( countryData, ( viewData ) => {
 			const country = countryInfo[ viewData.country_code ];
-			const icon = country.flat_flag_icon.match( /grey\.png/ ) ? null : country.flat_flag_icon;
+			const icon = `/calypso/images/flags/${ viewData.country_code.toLowerCase() }.svg`;
 
 			// ’ in country names causes google's geo viz to break
 			return {
 				label: country.country_full.replace( /’/, "'" ),
 				value: viewData.views,
 				region: country.map_region,
-				icon: icon
+				backgroundImage: icon
 			};
 		} );
 	},
@@ -328,6 +348,50 @@ export const normalizers = {
 		return { page, pages, total, posts };
 	},
 
+	statsComments( data, query, siteId, site ) {
+		if ( ! data ) {
+			return null;
+		}
+		const adminUrl = site ? site.options.admin_url : null;
+
+		let authors = [];
+		if ( data.authors ) {
+			authors = data.authors.map( ( author ) => {
+				return {
+					label: author.name,
+					value: author.comments,
+					iconClassName: 'avatar-user',
+					icon: parseAvatar( author.gravatar ),
+					link: adminUrl + 'edit-comments.php' + author.link,
+					className: 'module-content-list-item-large',
+					actions: [
+						{
+							type: 'follow',
+							data: author.follow_data ? author.follow_data.params : false
+						}
+					]
+				};
+			} );
+		}
+
+		let posts = [];
+		if ( data.posts ) {
+			posts = data.posts.map( ( post ) => {
+				return {
+					label: post.name,
+					value: post.comments,
+					page: site ? '/stats/post/' + post.id + '/' + site.slug : null,
+					actions: [ {
+						type: 'link',
+						data: post.link
+					} ]
+				};
+			} );
+		}
+
+		return { authors, posts };
+	},
+
 	/**
 	 * Returns a normalized statsVideo array, ready for use in stats-module
 	 *
@@ -335,13 +399,28 @@ export const normalizers = {
 	 * @return {Array}          Parsed data array
 	 */
 	statsVideo( payload ) {
-		if ( ! payload || ! payload.data ) {
-			return [];
+		if ( ! payload ) {
+			return null;
 		}
 
-		return payload.data.map( item => {
-			return { period: item[ 0 ], value: item[ 1 ] };
-		} ).slice( Math.max( payload.data.length - 10, 1 ) );
+		let data = [];
+		if ( payload.data ) {
+			data = payload.data.map( ( item ) => {
+				return { period: item[ 0 ], value: item[ 1 ] };
+			} ).slice( Math.max( payload.data.length - 10, 1 ) );
+		}
+
+		let pages = [];
+		if ( payload.pages ) {
+			pages = payload.pages.map( ( item ) => {
+				return {
+					label: item,
+					link: item
+				};
+			} );
+		}
+
+		return { pages, data };
 	},
 
 	/**
@@ -449,7 +528,8 @@ export const normalizers = {
 		}
 
 		const { startOf } = rangeOfPeriod( query.period, query.date );
-		const statsData = get( data, [ 'days', startOf, 'clicks' ], [] );
+		const dataPath = query.summarize ? [ 'summary', 'clicks' ] : [ 'days', startOf, 'clicks' ];
+		const statsData = get( data, dataPath, [] );
 
 		return statsData.map( ( item ) => {
 			const hasChildren = item.children && item.children.length > 0;
@@ -492,7 +572,8 @@ export const normalizers = {
 		}
 
 		const { startOf } = rangeOfPeriod( query.period, query.date );
-		const statsData = get( data, [ 'days', startOf, 'groups' ], [] );
+		const dataPath = query.summarize ? [ 'summary', 'groups' ] : [ 'days', startOf, 'groups' ];
+		const statsData = get( data, dataPath, [] );
 
 		const parseItem = ( item ) => {
 			let children;
@@ -599,8 +680,9 @@ export const normalizers = {
 		}
 
 		const { startOf } = rangeOfPeriod( query.period, query.date );
-		const searchTerms = get( data, [ 'days', startOf, 'search_terms' ], [] );
-		const encryptedSearchTerms = get( data, [ 'days', startOf, 'encrypted_search_terms' ], false );
+		const dataPath = query.summarize ? [ 'summary' ] : [ 'days', startOf ];
+		const searchTerms = get( data, dataPath.concat( [ 'search_terms' ] ), [] );
+		const encryptedSearchTerms = get( data, dataPath.concat( [ 'encrypted_search_terms' ] ), false );
 
 		const result = searchTerms.map( ( day ) => {
 			return {

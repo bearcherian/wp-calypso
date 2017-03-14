@@ -48,6 +48,16 @@ function Undocumented( wpcom ) {
 	this.wpcom = wpcom;
 }
 
+Undocumented.prototype.timezones = function( params, fn ) {
+	if ( typeof params === 'function' ) {
+		fn = params;
+		params = {};
+	}
+
+	let query = Object.assign( {}, params, { apiNamespace: 'wpcom/v2' } );
+	return this.wpcom.req.get( '/timezones', query, fn );
+};
+
 Undocumented.prototype.site = function( id ) {
 	return new Site( id, this.wpcom );
 };
@@ -432,29 +442,17 @@ Undocumented.prototype._sendRequestWithLocale = function( originalParams, fn ) {
 };
 
 /**
- * Determine whether a domain name can be mapped
- *
- * @param {string} domain - The domain name to check.
- * @param {Function} fn The callback function
- * @api public
- */
-Undocumented.prototype.isDomainMappable = function( domain, fn ) {
-	domain = encodeURIComponent( domain );
-
-	return this.wpcom.req.get( { path: '/domains/' + domain + '/is-mappable' }, fn );
-};
-
-/**
  * Determine whether a domain name is available for registration
  *
  * @param {string} domain - The domain name to check.
  * @param {Function} fn The callback function
+ * @returns {Promise} A promise that resolves when the request completes
  * @api public
  */
 Undocumented.prototype.isDomainAvailable = function( domain, fn ) {
-	domain = encodeURIComponent( domain );
-
-	return this.wpcom.req.get( { path: '/domains/' + domain + '/is-available' }, fn );
+	return this.wpcom.req.get( `/domains/${ encodeURIComponent( domain ) }/is-available`, {
+		apiVersion: '1.2'
+	}, fn );
 };
 
 /**
@@ -606,6 +604,33 @@ Undocumented.prototype.validateDomainContactInformation = function( contactInfor
 };
 
 /**
+ * Validates the specified Google Apps contact information
+ *
+ * @param {Object} contactInformation - user's contact information
+ * @param {Function} callback The callback function
+ * @returns {Promise} A promise that resolves when the request completes
+ * @api public
+ */
+Undocumented.prototype.validateGoogleAppsContactInformation = function( contactInformation, callback ) {
+	const data = mapKeysRecursively( { contactInformation }, snakeCase );
+
+	return this.wpcom.req.post(
+		{ path: '/me/google-apps/validate' },
+		data, ( error, successData ) => {
+			if ( error ) {
+				return callback( error );
+			}
+
+			const newData = mapKeysRecursively( successData, ( key ) => {
+				return ( key === '_headers' ) ? key : camelCase( key );
+			} );
+
+			callback( null, newData );
+		}
+	);
+};
+
+/**
  * Get a list of WordPress.com products
  *
  * @param {Function} fn The callback function
@@ -643,14 +668,14 @@ Undocumented.prototype.getSitePlans = function( siteDomain, fn ) {
 /**
  * GET/POST cart
  *
- * @param {string} [siteDomain] The site's slug
+ * @param {string} [cartKey] The cart's key
  * @param {string} [method] The request method
  * @param {object} [data] The REQUEST data
  * @param {Function} fn The callback function
  * @api public
  */
-Undocumented.prototype.cart = function( siteDomain, method, data, fn ) {
-	debug( '/sites/:site_id:/shopping-cart query' );
+Undocumented.prototype.cart = function( cartKey, method, data, fn ) {
+	debug( '/me/shopping-cart/:cart-key query' );
 	if ( arguments.length === 2 ) {
 		fn = method;
 		method = 'GET';
@@ -661,7 +686,7 @@ Undocumented.prototype.cart = function( siteDomain, method, data, fn ) {
 		data = {};
 	}
 	return this._sendRequestWithLocale( {
-		path: '/sites/' + siteDomain + '/shopping-cart',
+		path: '/me/shopping-cart/' + cartKey,
 		method: method,
 		body: data
 	}, fn );
@@ -2024,6 +2049,20 @@ Undocumented.prototype.cancelPlanTrial = function( planId, fn ) {
 
 	return this.wpcom.req.post( {
 		path: `/upgrades/${planId}/cancel-plan-trial`
+	}, fn );
+};
+
+/**
+ * Get the Directly configuration for the current user
+ *
+ * @param {Function} fn The callback function
+ * @returns {Promise} A promise that resolves when the request completes
+ * @api public
+ */
+Undocumented.prototype.getDirectlyConfiguration = function( fn ) {
+	return this.wpcom.req.get( {
+		apiVersion: '1.1',
+		path: '/help/directly/mine'
 	}, fn );
 };
 

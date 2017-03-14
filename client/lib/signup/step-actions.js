@@ -4,6 +4,7 @@
 import assign from 'lodash/assign';
 import defer from 'lodash/defer';
 import isEmpty from 'lodash/isEmpty';
+import pick from 'lodash/pick';
 import async from 'async';
 import { parse as parseURL } from 'url';
 import { startsWith } from 'lodash';
@@ -11,14 +12,11 @@ import { startsWith } from 'lodash';
 /**
  * Internal dependencies
  */
-import { cartItems } from 'lib/cart-values';
 import wpcom from 'lib/wp' ;
 const sites = require( 'lib/sites-list' )();
 const user = require( 'lib/user' )();
 import { getSavedVariations } from 'lib/abtest';
 import SignupCart from 'lib/signup/cart';
-import { startFreeTrial } from 'lib/upgrades/actions';
-import { PLAN_PREMIUM } from 'lib/plans/constants';
 import analytics from 'lib/analytics';
 
 import {
@@ -28,6 +26,26 @@ import {
 import { getSiteTitle } from 'state/signup/steps/site-title/selectors';
 import { getSurveyVertical, getSurveySiteType } from 'state/signup/steps/survey/selectors';
 
+function createSiteOrDomain( callback, dependencies, data, reduxStore ) {
+	const { designType, domainItem } = data;
+
+	if ( designType === 'domain' ) {
+		const cartKey = 'no-site';
+		const providedDependencies = {
+			siteId: null,
+			siteSlug: cartKey,
+			themeSlugWithRepo: null,
+			domainItem,
+		};
+
+		SignupCart.createCart( cartKey, [ domainItem ], error => callback( error, providedDependencies ) );
+	} else {
+		createSiteWithCart( ( errors, providedDependencies ) => {
+			callback( errors, pick( providedDependencies, [ 'siteId', 'siteSlug', 'themeSlugWithRepo', 'domainItem' ] ) );
+		}, dependencies, data, reduxStore );
+	}
+}
+
 function createSiteWithCart( callback, dependencies, {
 	cartItem,
 	domainItem,
@@ -36,9 +54,9 @@ function createSiteWithCart( callback, dependencies, {
 	siteUrl,
 	themeSlugWithRepo,
 	themeItem
-} ) {
-	const siteTitle = getSiteTitle( this._reduxStore.getState() ).trim();
-	const surveyVertical = getSurveyVertical( this._reduxStore.getState() ).trim();
+}, reduxStore ) {
+	const siteTitle = getSiteTitle( reduxStore.getState() ).trim();
+	const surveyVertical = getSurveyVertical( reduxStore.getState() ).trim();
 
 	wpcom.undocumented().sitesNew( {
 		blog_name: siteUrl,
@@ -49,8 +67,6 @@ function createSiteWithCart( callback, dependencies, {
 			// query. See `getThemeSlug` in `DomainsStep`.
 			theme: dependencies.themeSlugWithRepo || themeSlugWithRepo,
 			vertical: surveyVertical || undefined,
-			// the API wants the `is_domain_only` flag provided as a number
-			is_domain_only: dependencies.designType === 'domain' ? 1 : 0
 		},
 		validate: false,
 		find_available_url: isPurchasingItem
@@ -81,7 +97,7 @@ function createSiteWithCart( callback, dependencies, {
 			].filter( item => item );
 
 			if ( newCartItems.length ) {
-				SignupCart.addToCart( siteSlug, newCartItems, function( cartError ) {
+				SignupCart.addToCart( siteId, newCartItems, function( cartError ) {
 					callback( cartError, providedDependencies );
 				} );
 			} else {
@@ -92,7 +108,7 @@ function createSiteWithCart( callback, dependencies, {
 		if ( ! user.get() && isFreeThemePreselected ) {
 			setThemeOnSite( addToCartAndProceed, { siteSlug, themeSlugWithRepo } );
 		} else if ( user.get() && isFreeThemePreselected ) {
-			fetchSitesAndUser( siteSlug, setThemeOnSite.bind( this, addToCartAndProceed, { siteSlug, themeSlugWithRepo } ) );
+			fetchSitesAndUser( siteSlug, setThemeOnSite.bind( null, addToCartAndProceed, { siteSlug, themeSlugWithRepo } ) );
 		} else if ( user.get() ) {
 			fetchSitesAndUser( siteSlug, addToCartAndProceed );
 		} else {
@@ -101,33 +117,14 @@ function createSiteWithCart( callback, dependencies, {
 	} );
 }
 
-/**
- * Adds a Premium with free trial to the shopping cart.
- *
- * @param {function} callback - function to execute when action completes
- * @param {object} dependencies - data provided to the current step
- * @param {object} data - additional data provided by the current step
- */
-function startFreePremiumTrial( callback, dependencies, data ) {
-	const { siteId } = dependencies;
-
-	startFreeTrial( siteId, cartItems.planItem( PLAN_PREMIUM ), ( error ) => {
-		if ( error ) {
-			callback( error, dependencies );
-		} else {
-			callback( error, dependencies, data );
-		}
-	} );
-}
-
 function fetchSitesUntilSiteAppears( siteSlug, callback ) {
+	if ( sites.select( siteSlug ) ) {
+		callback();
+		return;
+	}
+
 	sites.once( 'change', function() {
-		if ( ! sites.select( siteSlug ) ) {
-			// if the site isn't in the list then bind to change and fetch again again
-			fetchSitesUntilSiteAppears( siteSlug, callback );
-		} else {
-			callback();
-		}
+		fetchSitesUntilSiteAppears( siteSlug, callback );
 	} );
 
 	// this call is deferred because sites.fetching is not set to false until
@@ -222,19 +219,11 @@ function getUsernameSuggestion( username, reduxState ) {
 }
 
 module.exports = {
-	createSiteWithCart: createSiteWithCart,
+	createSiteOrDomain,
 
-	createSiteWithCartAndStartFreeTrial( callback, dependencies, data ) {
-		createSiteWithCart( ( error, providedDependencies ) => {
-			if ( error ) {
-				callback( error, providedDependencies );
-			} else {
-				startFreePremiumTrial( callback, providedDependencies, data );
-			}
-		}, dependencies, data );
-	},
+	createSiteWithCart,
 
-	addPlanToCart( callback, { siteSlug }, { cartItem, privacyItem } ) {
+	addPlanToCart( callback, { siteId }, { cartItem, privacyItem } ) {
 		if ( isEmpty( cartItem ) ) {
 			// the user selected the free plan
 			defer( callback );
@@ -244,12 +233,12 @@ module.exports = {
 
 		const newCartItems = [ cartItem, privacyItem ].filter( item => item );
 
-		SignupCart.addToCart( siteSlug, newCartItems, callback );
+		SignupCart.addToCart( siteId, newCartItems, error => callback( error, { cartItem, privacyItem } ) );
 	},
 
-	createAccount( callback, dependencies, { userData, flowName, queryArgs } ) {
-		const surveyVertical = getSurveyVertical( this._reduxStore.getState() ).trim();
-		const surveySiteType = getSurveySiteType( this._reduxStore.getState() ).trim();
+	createAccount( callback, dependencies, { userData, flowName, queryArgs }, reduxStore ) {
+		const surveyVertical = getSurveyVertical( reduxStore.getState() ).trim();
+		const surveySiteType = getSurveySiteType( reduxStore.getState() ).trim();
 
 		wpcom.undocumented().usersNew( assign(
 			{}, userData, {
@@ -301,6 +290,8 @@ module.exports = {
 			}
 		} );
 	},
+
+	fetchSitesAndUser: fetchSitesAndUser,
 
 	setThemeOnSite: setThemeOnSite,
 

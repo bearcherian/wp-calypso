@@ -3,7 +3,7 @@
  */
 import React, { Component } from 'react';
 import { bindActionCreators } from 'redux';
-import { flowRight, isEqual, keys, omit, pick } from 'lodash';
+import { flowRight, isEqual, keys, omit, pick, isNaN } from 'lodash';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
 
@@ -22,7 +22,7 @@ import {
 import {
 	isRequestingJetpackSettings,
 	isUpdatingJetpackSettings,
-	isJetpackSettingsSaveSuccessful,
+	isJetpackSettingsSaveFailure,
 	getJetpackSettings
 } from 'state/selectors';
 import { recordGoogleEvent, recordTracksEvent } from 'state/analytics/actions';
@@ -47,9 +47,9 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 		componentDidUpdate( prevProps ) {
 			if ( prevProps.siteId !== this.props.siteId ) {
 				this.props.clearDirtyFields();
-			}
-
-			if (
+				const newSiteFields = getFormSettings( this.props.settings );
+				this.props.replaceFields( newSiteFields );
+			} else if (
 				! isEqual( prevProps.settings, this.props.settings ) ||
 				! isEqual( prevProps.fields, this.props.fields )
 			) {
@@ -123,14 +123,34 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 			this.props.updateFields( { [ currentTargetName ]: currentTargetValue } );
 		};
 
+		handleSelect = event => {
+			const { name, value } = event.currentTarget;
+			// Attempt to cast numeric fields value to int
+			const parsedValue = parseInt( value, 10 );
+			this.props.updateFields( { [ name ]: isNaN( parsedValue ) ? value : parsedValue } );
+		};
+
 		handleToggle = name => () => {
 			this.props.trackEvent( `Toggled ${ name }` );
 			this.props.updateFields( { [ name ]: ! this.props.fields[ name ] } );
 		};
 
+		handleAutosavingToggle = name => () => {
+			this.props.trackEvent( `Toggled ${ name }` );
+			this.props.updateFields( { [ name ]: ! this.props.fields[ name ] }, () => {
+				this.submitForm();
+			} );
+		};
+
 		onChangeField = field => event => {
 			this.props.updateFields( {
 				[ field ]: event.target.value
+			} );
+		};
+
+		setFieldValue = ( field, value ) => {
+			this.props.updateFields( {
+				[ field ]: value
 			} );
 		};
 
@@ -149,9 +169,12 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 		render() {
 			const utils = {
 				handleRadio: this.handleRadio,
+				handleSelect: this.handleSelect,
 				handleSubmitForm: this.handleSubmitForm,
 				handleToggle: this.handleToggle,
+				handleAutosavingToggle: this.handleAutosavingToggle,
 				onChangeField: this.onChangeField,
+				setFieldValue: this.setFieldValue,
 				submitForm: this.submitForm,
 				uniqueEventTracker: this.uniqueEventTracker,
 			};
@@ -186,7 +209,7 @@ const wrapSettingsForm = getFormSettings => SettingsForm => {
 			if ( jetpackSettingsUISupported ) {
 				const jetpackSettings = getJetpackSettings( state, siteId );
 				isSavingSettings = isSavingSettings || isUpdatingJetpackSettings( state, siteId );
-				isSaveRequestSuccessful = isSaveRequestSuccessful && isJetpackSettingsSaveSuccessful( state, siteId );
+				isSaveRequestSuccessful = isSaveRequestSuccessful && ! isJetpackSettingsSaveFailure( state, siteId );
 				settings = { ...settings, ...jetpackSettings };
 				settingsFields.jetpack = keys( jetpackSettings );
 				isRequestingSettings = isRequestingSettings || ( isRequestingJetpackSettings( state, siteId ) && ! jetpackSettings );

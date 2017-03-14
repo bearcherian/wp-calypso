@@ -3,7 +3,7 @@
  */
 import React, { Component, PropTypes } from 'react';
 import { localize } from 'i18n-calypso';
-import { filter } from 'lodash';
+import { filter, get } from 'lodash';
 
 /**
  * Internal dependencies
@@ -22,17 +22,14 @@ import {
 	PLAN_JETPACK_BUSINESS_MONTHLY,
 	PLAN_JETPACK_PERSONAL_MONTHLY,
 } from 'lib/plans/constants';
+import QueryPlans from 'components/data/query-plans';
+import QuerySitePlans from 'components/data/query-site-plans';
 import FAQ from 'components/faq';
 import FAQItem from 'components/faq/faq-item';
 import { isEnabled } from 'config';
 import purchasesPaths from 'me/purchases/paths';
 
 class PlansFeaturesMain extends Component {
-
-	isJetpackSite( site ) {
-		return site.jetpack;
-	}
-
 	getPlanFeatures() {
 		const {
 			site,
@@ -42,17 +39,18 @@ class PlansFeaturesMain extends Component {
 			isInSignup,
 			isLandingPage,
 			basePlansPath,
-			selectedFeature
+			selectedFeature,
+			displayJetpackPlans
 		} = this.props;
 
 		const isPersonalPlanEnabled = isEnabled( 'plans/personal-plan' );
-		if ( this.isJetpackSite( site ) && intervalType === 'monthly' ) {
+		if ( displayJetpackPlans && intervalType === 'monthly' ) {
 			const jetpackPlans = [ PLAN_JETPACK_FREE, PLAN_JETPACK_PERSONAL_MONTHLY, PLAN_JETPACK_PREMIUM_MONTHLY, PLAN_JETPACK_BUSINESS_MONTHLY ];
 			if ( hideFreePlan ) {
 				jetpackPlans.shift();
 			}
 			return (
-				<div className="plans-features-main__group">
+				<div className="plans-features-main__group" data-e2e-plans="jetpack">
 					<PlanFeatures
 						plans={ jetpackPlans }
 						selectedFeature={ selectedFeature }
@@ -67,13 +65,13 @@ class PlansFeaturesMain extends Component {
 			);
 		}
 
-		if ( this.isJetpackSite( site ) ) {
+		if ( displayJetpackPlans ) {
 			const jetpackPlans = [ PLAN_JETPACK_FREE, PLAN_JETPACK_PERSONAL, PLAN_JETPACK_PREMIUM, PLAN_JETPACK_BUSINESS ];
 			if ( hideFreePlan ) {
 				jetpackPlans.shift();
 			}
 			return (
-				<div className="plans-features-main__group">
+				<div className="plans-features-main__group" data-e2e-plans="jetpack">
 					<PlanFeatures
 						plans={ jetpackPlans }
 						selectedFeature={ selectedFeature }
@@ -99,7 +97,7 @@ class PlansFeaturesMain extends Component {
 		);
 
 		return (
-			<div className="plans-features-main__group">
+			<div className="plans-features-main__group" data-e2e-plans="wpcom">
 				<PlanFeatures
 					plans={ plans }
 					onUpgradeClick={ onUpgradeClick }
@@ -316,14 +314,21 @@ class PlansFeaturesMain extends Component {
 	}
 
 	render() {
-		const { site, showFAQ } = this.props;
+		const {
+			site,
+			showFAQ,
+			displayJetpackPlans
+		} = this.props;
+
 		const renderFAQ = () =>
-			this.isJetpackSite( site )
+			displayJetpackPlans
 				? this.getJetpackFAQ()
 				: this.getFAQ( site );
 
 		return (
 			<div className="plans-features-main">
+				<QueryPlans />
+				<QuerySitePlans siteId={ get( site, 'ID' ) } />
 				{ this.getPlanFeatures() }
 
 				{
@@ -336,7 +341,7 @@ class PlansFeaturesMain extends Component {
 	}
 }
 
-PlansFeaturesMain.PropTypes = {
+PlansFeaturesMain.propTypes = {
 	site: PropTypes.object,
 	isInSignup: PropTypes.bool,
 	isLandingPage: PropTypes.bool,
@@ -345,7 +350,8 @@ PlansFeaturesMain.PropTypes = {
 	onUpgradeClick: PropTypes.func,
 	hideFreePlan: PropTypes.bool,
 	showFAQ: PropTypes.bool,
-	selectedFeature: PropTypes.string
+	selectedFeature: PropTypes.string,
+	displayJetpackPlans: PropTypes.bool.isRequired
 };
 
 PlansFeaturesMain.defaultProps = {

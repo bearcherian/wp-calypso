@@ -3,7 +3,16 @@
 	text-align: center;
 }
 
-.design-type-with-store__section-wrapper {
+.design-type-with-store__substep-wrapper {
+	position: relative;
+}
+
+.design-type-with-store__list {
+	margin: 0 auto;
+	display: flex;
+	flex-flow: row wrap;
+	max-width: 640px;
+
 	opacity: 1;
 	filter: blur( 0 );
 	transform: translateZ( 0 ) translateX( 0 );
@@ -19,7 +28,6 @@
 .design-type-with-store__store-wrapper {
 	position: absolute;
 	width: 100%;
-
 	opacity: 1;
 	filter: blur( 0 );
 	transform: translateZ( 0 ) translateX( 0 );
@@ -32,35 +40,51 @@
 	}
 }
 
-.design-type-with-store__list {
-	margin: 0 auto;
-	display: flex;
-	flex-flow: row wrap;
-	max-width: 640px;
-}
-
 .design-type-with-store__choice {
 	padding: 0;
 	margin: 0 10px 20px 10px;
 	width: 230px;
 	flex-grow: 1;
 	transition: all 100ms ease-in-out;
+	position: relative;
 
 	a, svg {
 		display: block;
 		width: 100%; // Safari fix
 	}
 
-	h2 {
-		color: darken( $gray, 20% );
-		padding-left: 15px;
-		border-top: 1px solid transparentize( lighten( $gray, 20% ), .5 );
-		line-height: 54px;
-	}
-
 	&:hover {
 		box-shadow: 0 0 0 1px $gray, 0 2px 4px lighten( $gray, 20 );
 	}
+}
+
+.design-type-with-store__choice--test {
+	text-align: center;
+}
+
+.design-type-with-store__choice-copy {
+	padding: 15px;
+	border-top: 1px solid transparentize( lighten( $gray, 20% ), .5 );
+}
+
+.design-type-with-store__choice-label {
+	color: darken( $gray, 20% );
+	padding: 0;
+}
+
+.design-type-with-store__choice-label--test {
+	color: $blue-wordpress;
+	position: relative;
+}
+
+.design-type-with-store__choice-description {
+	margin: 10px 0 0;
+	color: $gray;
+	font-size: 0.875em;
+}
+
+.button.design-type-with-store__cta {
+	color: $blue-wordpress;
 }
 
 .design-type-with-store__flex-container {
@@ -104,6 +128,10 @@
 	background-color: #f3f6f8;
 	box-sizing: border-box;
 	height: 195px;
+}
+
+.design-type-with-store__partner-box {
+	text-align: center;
 }
 
 @include breakpoint( "<480px" ) {
@@ -191,6 +219,7 @@
 
 .design-type-with-store__back-button-wrapper {
 	margin: 32px;
+	text-align: center;
 }
 
 .design-type-with-store__bluehost-logo {
@@ -205,4 +234,11 @@
 	height: 30px;
 	display: block;
 	margin-bottom: 18px;
+}
+
+.design-type-with-store__disclaimer {
+	text-align: center;
+	color: darken( $gray, 20 );
+	font-size: 0.875em;
+	width: 100%;
 }

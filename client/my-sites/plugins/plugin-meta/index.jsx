@@ -2,11 +2,13 @@
  * External dependencies
  */
 import React from 'react';
+import { connect } from 'react-redux';
 import classNames from 'classnames';
 import i18n from 'i18n-calypso';
 import some from 'lodash/some';
 import get from 'lodash/get';
 import { includes } from 'lodash';
+import { isEmpty } from 'lodash';
 import Gridicon from 'gridicons';
 
 /**
@@ -37,12 +39,12 @@ import {
 	isBusiness,
 	isEnterprise
 } from 'lib/products-values';
+import { getSelectedSiteId } from 'state/ui/selectors';
+import { isAutomatedTransferActive } from 'state/selectors';
 import QueryEligibility from 'components/data/query-atat-eligibility';
 
-export default React.createClass( {
+const PluginMeta = React.createClass( {
 	OUT_OF_DATE_YEARS: 2,
-
-	displayName: 'PluginMeta',
 
 	propTypes: {
 		siteURL: React.PropTypes.string,
@@ -52,6 +54,21 @@ export default React.createClass( {
 		isInstalledOnSite: React.PropTypes.bool,
 		isPlaceholder: React.PropTypes.bool,
 		isMock: React.PropTypes.bool,
+		allowedActions: React.PropTypes.shape( {
+			activation: React.PropTypes.bool,
+			autoupdate: React.PropTypes.bool,
+			remove: React.PropTypes.bool,
+		} ),
+	},
+
+	getDefaultProps() {
+		return {
+			allowedActions: {
+				activation: true,
+				autoupdate: true,
+				remove: true,
+			}
+		};
 	},
 
 	displayBanner() {
@@ -121,14 +138,29 @@ export default React.createClass( {
 			return ( <div className="plugin-meta__actions"> { this.getInstallButton() } </div> );
 		}
 
+		const {
+			autoupdate: canToggleAutoupdate,
+			activation: canToggleActivation,
+			remove: canRemove,
+		} = this.props.allowedActions;
 		return (
 			<div className="plugin-meta__actions">
-				<PluginActivateToggle plugin={ this.props.plugin } site={ this.props.selectedSite }
-					notices={ this.props.notices } isMock={ this.props.isMock } />
-				<PluginAutoupdateToggle plugin={ this.props.plugin } site={ this.props.selectedSite }
-					notices={ this.props.notices } wporg={ this.props.plugin.wporg } isMock={ this.props.isMock } />
-				<PluginRemoveButton plugin={ this.props.plugin } site={ this.props.selectedSite }
-					notices={ this.props.notices } isMock={ this.props.isMock } />
+				{ canToggleActivation && <PluginActivateToggle
+						plugin={ this.props.plugin }
+						site={ this.props.selectedSite }
+						notices={ this.props.notices }
+						isMock={ this.props.isMock } /> }
+				{ canToggleAutoupdate && <PluginAutoupdateToggle
+						plugin={ this.props.plugin }
+						site={ this.props.selectedSite }
+						notices={ this.props.notices }
+						wporg={ this.props.plugin.wporg }
+						isMock={ this.props.isMock } /> }
+				{ canRemove && <PluginRemoveButton
+						plugin={ this.props.plugin }
+						site={ this.props.selectedSite }
+						notices={ this.props.notices }
+						isMock={ this.props.isMock } /> }
 			</div>
 		);
 	},
@@ -165,10 +197,12 @@ export default React.createClass( {
 			return <PluginInstallButton { ...this.props } />;
 		}
 
+		const { isTransferring } = this.props;
+
 		if ( this.props.selectedSite && ! this.props.selectedSite.jetpack ) {
 			return (
 				<WpcomPluginInstallButton
-					disabled={ ! this.hasBusinessPlan() }
+					disabled={ ! this.hasBusinessPlan() || isTransferring }
 					plugin={ this.props.plugin }
 				/>
 			);
@@ -327,6 +361,7 @@ export default React.createClass( {
 		} );
 
 		const plugin = this.props.selectedSite && this.props.sites[ 0 ] ? this.props.sites[ 0 ].plugin : this.props.plugin;
+		const actionLinks = get( plugin, 'action_links' );
 
 		return (
 			<div className="plugin-meta">
@@ -342,6 +377,18 @@ export default React.createClass( {
 							<div className="plugin-meta__meta">
 								{ this.renderAuthorUrl() }
 							</div>
+							{ ! isEmpty( actionLinks ) &&
+								<div className="plugin-meta__action-links">
+									{ Object.keys( actionLinks ).map( linkTitle => (
+										<Button compact icon
+											href={ actionLinks[ linkTitle ] }
+											target="_blank"
+											rel="noopener noreferrer">
+												{ linkTitle } <Gridicon icon="external" />
+										</Button>
+									) ) }
+								</div>
+							}
 						</div>
 						{ this.renderActions() }
 					</div>
@@ -382,3 +429,13 @@ export default React.createClass( {
 		);
 	}
 } );
+
+const mapStateToProps = state => {
+	const siteId = getSelectedSiteId( state );
+
+	return {
+		isTransferring: isAutomatedTransferActive( state, siteId ),
+	};
+};
+
+export default connect( mapStateToProps )( PluginMeta );

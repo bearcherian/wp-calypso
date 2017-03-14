@@ -36,17 +36,17 @@ import addDiscoverProperties from 'lib/post-normalizer/rule-add-discover-propert
  * Module vars
  */
 export const
-	READER_CONTENT_WIDTH = 720,
+	READER_CONTENT_WIDTH = 800,
 	PHOTO_ONLY_MIN_WIDTH = 440,
 	GALLERY_MIN_IMAGES = 4,
 	GALLERY_MIN_IMAGE_WIDTH = 350;
 
 function getCharacterCount( post ) {
-	if ( ! post || ! post.better_excerpt_no_html ) {
+	if ( ! post || ! post.content_no_html ) {
 		return 0;
 	}
 
-	return post.better_excerpt_no_html.length;
+	return post.content_no_html.length;
 }
 
 export function imageIsBigEnoughForGallery( image ) {

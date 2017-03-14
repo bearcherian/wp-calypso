@@ -2,6 +2,7 @@
  * External dependencies
  */
 import { expect } from 'chai';
+import { moment } from 'i18n-calypso';
 
 /**
  * Internal dependencies
@@ -11,6 +12,7 @@ import {
 	normalizers,
 	rangeOfPeriod,
 	buildExportArray,
+	isAutoRefreshAllowedForQuery,
 } from '../utils';
 
 describe( 'utils', () => {
@@ -125,6 +127,38 @@ describe( 'utils', () => {
 			} );
 
 			expect( serializedQuery ).to.eql( serializedQueryTwo );
+		} );
+	} );
+
+	describe( 'isAutoRefreshAllowedForQuery()', () => {
+		it( 'should return true if not query specified', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery();
+			expect( isAllowed ).to.be.true;
+		} );
+
+		it( 'should return true for empty queries', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery( {} );
+			expect( isAllowed ).to.be.true;
+		} );
+
+		it( 'should return true for queries without date', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery( { quantity: 3 } );
+			expect( isAllowed ).to.be.true;
+		} );
+
+		it( 'should return true for queries without period', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery( { date: '2016-06-01' } );
+			expect( isAllowed ).to.be.true;
+		} );
+
+		it( 'should return false for a period that doesn\'t include today', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery( { period: 'week', date: '2016-06-01' } );
+			expect( isAllowed ).to.be.false;
+		} );
+
+		it( 'should return true for a period that includes today', () => {
+			const isAllowed = isAutoRefreshAllowedForQuery( { period: 'day', date: moment().format( 'YYYY-MM-DD' ) } );
+			expect( isAllowed ).to.be.true;
 		} );
 	} );
 
@@ -248,6 +282,63 @@ describe( 'utils', () => {
 							value: 10
 						}
 					]
+				} );
+			} );
+		} );
+
+		describe( 'statsComments()', () => {
+			it( 'should return null if no data is provided', () => {
+				const parsedData = normalizers.statsComments();
+				expect( parsedData ).to.be.null;
+			} );
+
+			it( 'should properly parse comments stats response', () => {
+				const parsedData = normalizers.statsComments( {
+					authors: [
+						{
+							name: 'John',
+							comments: 12,
+							link: '?user_id=1662656',
+							gravatar: 'https://secure.gravatar.com/blavatar/5a83891a81b057fed56930a6aaaf7b3c?s=48',
+							follow_data: null,
+						}
+					],
+					posts: [
+						{
+							id: 1111,
+							name: 'My title',
+							comments: 10,
+							link: 'https://en.blog.wordpress.com/chicken',
+						}
+					]
+				} );
+
+				expect( parsedData ).to.eql( {
+					posts: [ {
+						actions: [
+							{
+								data: 'https://en.blog.wordpress.com/chicken',
+								type: 'link'
+							}
+						],
+						label: 'My title',
+						page: null,
+						value: 10
+					} ],
+					authors: [ {
+						actions: [
+							{
+								data: false,
+								type: 'follow'
+							}
+						],
+						className: 'module-content-list-item-large',
+						icon: 'https://secure.gravatar.com/blavatar/5a83891a81b057fed56930a6aaaf7b3c?d=mm',
+						iconClassName: 'avatar-user',
+						label: 'John',
+						link: 'nulledit-comments.php?user_id=1662656',
+						value: 12
+					} ]
 				} );
 			} );
 		} );
@@ -433,7 +524,7 @@ describe( 'utils', () => {
 						label: 'United States',
 						value: 1,
 						region: '021',
-						icon: 'https://secure.gravatar.com/blavatar/9f4faa5ad0c723474f7a6d810172447c?s=48'
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -469,7 +560,7 @@ describe( 'utils', () => {
 						label: 'United States',
 						value: 10,
 						region: '021',
-						icon: 'https://secure.gravatar.com/blavatar/9f4faa5ad0c723474f7a6d810172447c?s=48'
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -504,7 +595,7 @@ describe( 'utils', () => {
 						label: 'United States',
 						value: 100,
 						region: '021',
-						icon: 'https://secure.gravatar.com/blavatar/9f4faa5ad0c723474f7a6d810172447c?s=48'
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -540,43 +631,7 @@ describe( 'utils', () => {
 						label: 'United States',
 						value: 100,
 						region: '021',
-						icon: 'https://secure.gravatar.com/blavatar/9f4faa5ad0c723474f7a6d810172447c?s=48'
-					}
-				] );
-			} );
-
-			it( 'should ignore missing grey flag icons', () => {
-				const parsedData = normalizers.statsCountryViews( {
-					date: '2015-12-25',
-					days: {
-						'2015-12-01': {
-							views: [ {
-								country_code: 'US',
-								views: 100
-							} ],
-							other_views: 0,
-							total_views: 100
-						}
-					},
-					'country-info': {
-						US: {
-							flag_icon: 'https://secure.gravatar.com/blavatar/5a83891a81b057fed56930a6aaaf7b3c?s=48',
-							flat_flag_icon: 'https://s-ssl.wordpress.com/i/stats/square-grey.png',
-							country_full: 'United States',
-							map_region: '021'
-						}
-					}
-				}, {
-					period: 'month',
-					date: '2015-12-25'
-				} );
-
-				expect( parsedData ).to.eql( [
-					{
-						label: 'United States',
-						value: 100,
-						region: '021',
-						icon: null
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -612,7 +667,7 @@ describe( 'utils', () => {
 						label: 'US\'A',
 						value: 100,
 						region: '021',
-						icon: null
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -651,7 +706,7 @@ describe( 'utils', () => {
 						label: 'United States',
 						value: 100,
 						region: '021',
-						icon: 'https://secure.gravatar.com/blavatar/9f4faa5ad0c723474f7a6d810172447c?s=48'
+						backgroundImage: '/calypso/images/flags/us.svg'
 					}
 				] );
 			} );
@@ -675,14 +730,16 @@ describe( 'utils', () => {
 					highest_hour: 11,
 					highest_day_percent: 10,
 					highest_day_of_week: 6,
-					highest_hour_percent: 5
+					highest_hour_percent: 5,
+					hourly_views: []
 				} );
 
 				expect( stats ).to.eql( {
 					day: 'Sunday',
 					hour: '11:00 AM',
 					hourPercent: 5,
-					percent: 10
+					percent: 10,
+					hourlyViews: []
 				} );
 			} );
 		} );
@@ -781,16 +838,10 @@ describe( 'utils', () => {
 		} );
 
 		describe( 'statsVideo()', () => {
-			it( 'should return an empty array if not data is passed', () => {
+			it( 'should return null if not data is passed', () => {
 				const parsedData = normalizers.statsVideo();
 
-				expect( parsedData ).to.eql( [] );
-			} );
-
-			it( 'should return an empty array if not data has no data attribute', () => {
-				const parsedData = normalizers.statsVideo( { bad: [] } );
-
-				expect( parsedData ).to.eql( [] );
+				expect( parsedData ).to.eql( null );
 			} );
 
 			it( 'should return an a properly parsed data array', () => {
@@ -798,15 +849,36 @@ describe( 'utils', () => {
 					data: [
 						[ '2016-11-12', 1 ],
 						[ '2016-11-13', 0 ]
+					],
+					pages: [
+						'https://vip.wordpress.com/category/themes/',
+						'http://freewordpressthemes.ru/p2-theme-for-the-blog-inspired-twitter.html',
+						'http://www.themepremium.com/blog-with-the-speed-of-your-thought-with-the-p2-theme/'
 					]
 				} );
 
-				expect( parsedData ).to.eql( [
-					{
-						period: '2016-11-13',
-						value: 0,
-					}
-				] );
+				expect( parsedData ).to.eql( {
+					data: [
+						{
+							period: '2016-11-13',
+							value: 0,
+						}
+					],
+					pages: [
+						{
+							label: 'https://vip.wordpress.com/category/themes/',
+							link: 'https://vip.wordpress.com/category/themes/',
+						},
+						{
+							label: 'http://freewordpressthemes.ru/p2-theme-for-the-blog-inspired-twitter.html',
+							link: 'http://freewordpressthemes.ru/p2-theme-for-the-blog-inspired-twitter.html',
+						},
+						{
+							label: 'http://www.themepremium.com/blog-with-the-speed-of-your-thought-with-the-p2-theme/',
+							link: 'http://www.themepremium.com/blog-with-the-speed-of-your-thought-with-the-p2-theme/',
+						}
+					]
+				} );
 			} );
 		} );
 
@@ -1044,6 +1116,67 @@ describe( 'utils', () => {
 					}
 				] );
 			} );
+
+			it( 'should return an a properly parsed summary data array', () => {
+				const parsedData = normalizers.statsClicks( {
+					date: '2017-01-12',
+					summary: {
+						clicks: [
+							{
+								icon: 'https://secure.gravatar.com/blavatar/94ea57385f5018d2b84169cab22d3b33?s=48',
+								name: 'en.support.wordpress.com',
+								url: null,
+								views: 50,
+								children: [
+									{
+										name: 'en.support.wordpress.com',
+										url: 'https://en.support.wordpress.com/',
+										views: 50
+									}
+								]
+							},
+							{
+								children: null,
+								icon: 'https://secure.gravatar.com/blavatar/3dbcb399a9112e3bb46f706b01c80062?s=48',
+								name: 'en.forums.wordpress.com',
+								url: 'https://en.forums.wordpress.com/',
+								views: 10
+							}
+						]
+					}
+				}, {
+					period: 'day',
+					date: '2017-01-12',
+					summarize: 1
+				} );
+
+				expect( parsedData ).to.eql( [
+					{
+						children: [
+							{
+								children: null,
+								label: 'en.support.wordpress.com',
+								labelIcon: 'external',
+								link: 'https://en.support.wordpress.com/',
+								value: 50
+							}
+						],
+						icon: 'https://secure.gravatar.com/blavatar/94ea57385f5018d2b84169cab22d3b33?s=48',
+						label: 'en.support.wordpress.com',
+						labelIcon: null,
+						link: null,
+						value: 50
+					},
+					{
+						children: null,
+						icon: 'https://secure.gravatar.com/blavatar/3dbcb399a9112e3bb46f706b01c80062?s=48',
+						label: 'en.forums.wordpress.com',
+						labelIcon: 'external',
+						link: 'https://en.forums.wordpress.com/',
+						value: 10
+					}
+				] );
+			} );
 		} );
 
 		describe( 'statsReferrers()', () => {
@@ -1060,6 +1193,87 @@ describe( 'utils', () => {
 			it( 'should return an empty array if query.date is null', () => {
 				const parsedData = normalizers.statsReferrers( {}, { period: 'day' } );
 				expect( parsedData ).to.eql( [] );
+			} );
+
+			it( 'should return an a properly parsed summary data array', () => {
+				const parsedData = normalizers.statsReferrers( {
+					date: '2017-01-12',
+					summary: {
+						groups: [
+							{
+								group: 'WordPress.com Reader',
+								name: 'WordPress.com Reader',
+								url: 'https://wordpress.com',
+								icon: 'https://secure.gravatar.com/blavatar/236c008da9dc0edb4b3464ecebb3fc1d?s=48',
+								results: {
+									views: 500
+								},
+								total: 500
+							},
+							{
+								group: 'en.support.wordpress.com',
+								icon: 'https://secure.gravatar.com/blavatar/94ea57385f5018d2b84169cab22d3b33?s=48',
+								name: 'en.support.wordpress.com',
+								results: [
+									{ name: 'homepage', url: 'https://en.support.wordpress.com/', views: 200 },
+									{ name: 'start', url: 'https://en.support.wordpress.com/start/', views: 100 }
+								],
+								total: 300
+							}
+						]
+					}
+				}, {
+					period: 'day',
+					date: '2017-01-12',
+					domain: 'en.blog.wordpress.com',
+					summarize: 1
+				}, 100 );
+
+				expect( parsedData ).to.eql( [
+					{
+						actionMenu: 0,
+						actions: [],
+						children: undefined,
+						icon: 'https://secure.gravatar.com/blavatar/236c008da9dc0edb4b3464ecebb3fc1d?s=48',
+						label: 'WordPress.com Reader',
+						labelIcon: 'external',
+						link: 'https://wordpress.com',
+						value: 500
+					},
+					{
+						actionMenu: 1,
+						actions: [
+							{
+								data: {
+									domain: 'en.support.wordpress.com',
+									siteID: 100
+								},
+								type: 'spam'
+							}
+						],
+						children: [
+							{
+								children: undefined,
+								label: 'homepage',
+								labelIcon: 'external',
+								link: 'https://en.support.wordpress.com/',
+								value: 200
+							},
+							{
+								children: undefined,
+								label: 'start',
+								labelIcon: 'external',
+								link: 'https://en.support.wordpress.com/start/',
+								value: 100
+							}
+						],
+						icon: 'https://secure.gravatar.com/blavatar/94ea57385f5018d2b84169cab22d3b33?s=48',
+						label: 'en.support.wordpress.com',
+						labelIcon: null,
+						link: undefined,
+						value: 300
+					},
+				] );
 			} );
 
 			it( 'should return an a properly parsed data array', () => {
@@ -1201,6 +1415,49 @@ describe( 'utils', () => {
 						labelIcon: 'external',
 						link: 'http://en.support.wordpress.com/stats/#search-engine-terms',
 						value: 221
+					}
+				] );
+			} );
+
+			it( 'should return an a properly parsed summarized data array', () => {
+				const parsedData = normalizers.statsSearchTerms( {
+					date: '2017-01-12',
+					summary: {
+						encrypted_search_terms: 400,
+						search_terms: [
+							{
+								term: 'chicken',
+								views: 200
+							},
+							{
+								term: 'ribs',
+								views: 100
+							}
+						]
+					}
+				}, {
+					period: 'day',
+					date: '2017-01-12',
+					summarize: 1,
+					num: 90
+				} );
+
+				expect( parsedData ).to.eql( [
+					{
+						className: 'user-selectable',
+						label: 'chicken',
+						value: 200
+					},
+					{
+						className: 'user-selectable',
+						label: 'ribs',
+						value: 100
+					},
+					{
+						label: 'Unknown Search Terms',
+						labelIcon: 'external',
+						link: 'http://en.support.wordpress.com/stats/#search-engine-terms',
+						value: 400
 					}
 				] );
 			} );

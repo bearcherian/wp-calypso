@@ -8,12 +8,17 @@ import { connect } from 'react-redux';
 /**
  * Internal dependencies
  */
-import Card from 'components/card';
+import CompactCard from 'components/card/compact';
 import JetpackModuleToggle from '../jetpack-module-toggle';
 import FormFieldset from 'components/forms/form-fieldset';
-import FormToggle from 'components/forms/form-toggle';
+import CompactFormToggle from 'components/forms/form-toggle/compact';
 import { getSelectedSiteId, getSelectedSiteSlug } from 'state/ui/selectors';
-import { isJetpackModuleActive } from 'state/selectors';
+import {
+	isJetpackModuleActive,
+	isJetpackModuleUnavailableInDevelopmentMode,
+	isJetpackSiteInDevelopmentMode
+} from 'state/selectors';
+import QueryJetpackConnection from 'components/data/query-jetpack-connection';
 import InfoPopover from 'components/info-popover';
 import ExternalLink from 'components/external-link';
 
@@ -22,58 +27,57 @@ const Subscriptions = ( {
 	handleToggle,
 	isRequestingSettings,
 	isSavingSettings,
+	moduleUnavailable,
 	selectedSiteId,
 	selectedSiteSlug,
 	subscriptionsModuleActive,
 	translate
 } ) => {
 	return (
-		<Card className="subscriptions__card site-settings">
-			<FormFieldset>
-				<div className="subscriptions__info-link-container">
-					<InfoPopover position={ 'left' }>
-						<ExternalLink href={ 'https://jetpack.com/support/subscriptions' } target="_blank">
-							{ translate( 'Learn more about Subscriptions' ) }
-						</ExternalLink>
-					</InfoPopover>
-				</div>
+		<div>
+			<QueryJetpackConnection siteId={ selectedSiteId } />
 
-				<JetpackModuleToggle
-					siteId={ selectedSiteId }
-					moduleSlug="subscriptions"
-					label={ translate( 'Allow users to subscribe to your posts and comments and receive notifications via email.' ) }
-					disabled={ isRequestingSettings || isSavingSettings }
-					/>
+			<CompactCard className="subscriptions__card site-settings__discussion-settings">
+				<FormFieldset>
+					<div className="subscriptions__info-link-container site-settings__info-link-container">
+						<InfoPopover position={ 'left' }>
+							<ExternalLink href={ 'https://jetpack.com/support/subscriptions' } target="_blank">
+								{ translate( 'Learn more about Subscriptions' ) }
+							</ExternalLink>
+						</InfoPopover>
+					</div>
 
-				<div className="subscriptions__module-settings is-indented">
-					<FormToggle
-						className="subscriptions__module-settings-toggle is-compact"
-						checked={ !! fields.stb_enabled }
-						disabled={ isRequestingSettings || isSavingSettings || ! subscriptionsModuleActive }
-						onChange={ handleToggle( 'stb_enabled' ) }>
-						<span className="site-settings__toggle-label">
+					<JetpackModuleToggle
+						siteId={ selectedSiteId }
+						moduleSlug="subscriptions"
+						label={ translate( 'Allow users to subscribe to your posts and comments and receive notifications via email.' ) }
+						disabled={ isRequestingSettings || isSavingSettings || moduleUnavailable }
+						/>
+
+					<div className="subscriptions__module-settings site-settings__child-settings">
+						<CompactFormToggle
+							checked={ !! fields.stb_enabled }
+							disabled={ isRequestingSettings || isSavingSettings || ! subscriptionsModuleActive || moduleUnavailable }
+							onChange={ handleToggle( 'stb_enabled' ) }
+						>
 							{ translate( 'Show a "follow blog" option in the comment form' ) }
-						</span>
-					</FormToggle>
+						</CompactFormToggle>
 
-					<FormToggle
-						className="subscriptions__module-settings-toggle is-compact"
-						checked={ !! fields.stc_enabled }
-						disabled={ isRequestingSettings || isSavingSettings || ! subscriptionsModuleActive }
-						onChange={ handleToggle( 'stc_enabled' ) }>
-						<span className="site-settings__toggle-label">
+						<CompactFormToggle
+							checked={ !! fields.stc_enabled }
+							disabled={ isRequestingSettings || isSavingSettings || ! subscriptionsModuleActive || moduleUnavailable }
+							onChange={ handleToggle( 'stc_enabled' ) }
+						>
 							{ translate( 'Show a "follow comments" option in the comment form.' ) }
-						</span>
-					</FormToggle>
+						</CompactFormToggle>
+					</div>
+				</FormFieldset>
+			</CompactCard>
 
-					<p className="subscriptions__email-followers">
-						<a href={ '/people/email-followers/' + selectedSiteSlug }>
-							{ translate( 'View your Email Followers' ) }
-						</a>
-					</p>
-				</div>
-			</FormFieldset>
-		</Card>
+			<CompactCard href={ '/people/email-followers/' + selectedSiteSlug }>
+				{ translate( 'View your Email Followers' ) }
+			</CompactCard>
+		</div>
 	);
 };
 
@@ -95,11 +99,14 @@ export default connect(
 	( state ) => {
 		const selectedSiteId = getSelectedSiteId( state );
 		const selectedSiteSlug = getSelectedSiteSlug( state );
+		const siteInDevMode = isJetpackSiteInDevelopmentMode( state, selectedSiteId );
+		const moduleUnavailableInDevMode = isJetpackModuleUnavailableInDevelopmentMode( state, selectedSiteId, 'subscriptions' );
 
 		return {
 			selectedSiteId,
 			selectedSiteSlug,
 			subscriptionsModuleActive: !! isJetpackModuleActive( state, selectedSiteId, 'subscriptions' ),
+			moduleUnavailable: siteInDevMode && moduleUnavailableInDevMode,
 		};
 	}
 )( localize( Subscriptions ) );

@@ -39,6 +39,7 @@ import { recordTracksEvent } from 'state/analytics/actions';
 import { isDomainOnlySite } from 'state/selectors';
 import { isPlanFeaturesEnabled } from 'lib/plans';
 import DomainToPlanNudge from 'blocks/domain-to-plan-nudge';
+import { type } from 'lib/domains/constants';
 
 export const List = React.createClass( {
 	mixins: [ analyticsMixin( 'domainManagement', 'list' ) ],
@@ -98,7 +99,9 @@ export const List = React.createClass( {
 				<Main>
 					<SidebarNavigation />
 					<DomainOnly
-						domainName={ this.props.selectedSite.domain } />
+						domainName={ this.props.selectedSite.domain }
+						siteId={ this.props.selectedSite.ID }
+					/>
 				</Main>
 			);
 		}
@@ -213,6 +216,10 @@ export const List = React.createClass( {
 	},
 
 	headerButtons() {
+		if ( this.props.selectedSite && this.props.selectedSite.jetpack ) {
+			return null;
+		}
+
 		if ( this.state.changePrimaryDomainModeEnabled ) {
 			return (
 				<Button
@@ -327,7 +334,10 @@ export const List = React.createClass( {
 			return times( 3, n => <ListItemPlaceholder key={ `item-${ n }` } /> );
 		}
 
-		return this.props.domains.list.map( ( domain, index ) => {
+		const domains = this.props.selectedSite.jetpack
+			? this.props.domains.list.filter( domain => domain.type !== type.WPCOM )
+			: this.props.domains.list;
+		return domains.map( ( domain, index ) => {
 			return (
 				<ListItem
 					key={ domain.name }

@@ -111,13 +111,13 @@ class StatModuleFollowers extends Component {
 
 		const summaryPageSlug = siteSlug || '';
 		const summaryPageLink = 'email-followers' === activeFilter
-			? '/stats/follows/email/' + summaryPageSlug
-			: '/stats/follows/wpcom/' + summaryPageSlug;
+			? '/people/email-followers/' + summaryPageSlug
+			: '/people/followers/' + summaryPageSlug;
 
 		return (
 			<div>
-				<QuerySiteStats statType="statsFollowers" siteId={ siteId } query={ wpcomQuery } />
-				<QuerySiteStats statType="statsFollowers" siteId={ siteId } query={ emailQuery } />
+				{ siteId && <QuerySiteStats statType="statsFollowers" siteId={ siteId } query={ wpcomQuery } /> }
+				{ siteId && <QuerySiteStats statType="statsFollowers" siteId={ siteId } query={ emailQuery } /> }
 				<SectionHeader label={ translate( 'Followers' ) } href={ summaryPageLink } />
 				<Card className={ classNames( ...classes ) }>
 					<div className="followers">

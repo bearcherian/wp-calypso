@@ -25,17 +25,22 @@ import {
 	THEME_REQUEST,
 	THEME_REQUEST_SUCCESS,
 	THEME_REQUEST_FAILURE,
-	THEMES_RECEIVE,
 	THEMES_REQUEST,
 	THEMES_REQUEST_SUCCESS,
 	THEMES_REQUEST_FAILURE,
+	THEME_PREVIEW_OPTIONS,
+	THEME_PREVIEW_STATE,
 } from 'state/action-types';
 import {
 	getSerializedThemesQuery,
 	getThemeIdFromStylesheet
 } from './utils';
 import { createReducer, isValidStateWithSchema } from 'state/utils';
-import { queriesSchema, activeThemesSchema } from './schema';
+import {
+	queriesSchema,
+	activeThemesSchema,
+	themeRequestErrorsSchema,
+} from './schema';
 import themesUI from './themes-ui/reducer';
 import uploadTheme from './upload-theme/reducer';
 
@@ -211,7 +216,7 @@ export const themeRequestErrors = createReducer( {}, {
 		...state,
 		[ siteId ]: omit( state[ siteId ], themeId ),
 	} )
-} );
+}, themeRequestErrorsSchema );
 
 /**
  * Returns the updated theme query requesting state after an action has been
@@ -306,9 +311,6 @@ export const queries = ( () => {
 		[ THEMES_REQUEST_SUCCESS ]: ( state, { siteId, query, themes, found } ) => {
 			return applyToManager( state, siteId, 'receive', true, themes, { query, found } );
 		},
-		[ THEMES_RECEIVE ]: ( state, { siteId, themes } ) => {
-			return applyToManager( state, siteId, 'receive', true, themes );
-		},
 		[ THEME_DELETE_SUCCESS ]: ( state, { siteId, themeId } ) => {
 			return applyToManager( state, siteId, 'removeItem', false, themeId );
 		},
@@ -342,6 +344,33 @@ export const lastQuery = createReducer( {}, {
 	} )
 } );
 
+/**
+ * Returns the updated previewing theme state
+ * The state holds information about primary and secondary theme actions usable in preview.
+ *
+ * @param  {Object} state  Current state
+ * @param  {Object} action Action payload
+ * @return {Object}        Updated state
+ */
+export const themePreviewOptions = createReducer( {}, {
+	[ THEME_PREVIEW_OPTIONS ]: ( state, { primary, secondary } ) => ( {
+		primary,
+		secondary
+	} )
+} );
+
+/**
+ * Returns the updated previewing theme state
+ * The state reflects if Theme Preview component should be visible or not.
+ *
+ * @param  {Bool}   state  Current state
+ * @param  {Object} action Action payload
+ * @return {Bool}          Updated state
+ */
+export const themePreviewVisibility = createReducer( null, {
+	[ THEME_PREVIEW_STATE ]: ( state, { themeId } ) => ( themeId )
+} );
+
 export default combineReducers( {
 	queries,
 	queryRequests,
@@ -355,5 +384,7 @@ export default combineReducers( {
 	activationRequests,
 	completedActivationRequests,
 	themesUI,
-	uploadTheme
+	uploadTheme,
+	themePreviewOptions,
+	themePreviewVisibility
 } );

@@ -13,7 +13,7 @@ import Card from 'components/card';
 import Button from 'components/button';
 import JetpackModuleToggle from '../jetpack-module-toggle';
 import FormFieldset from 'components/forms/form-fieldset';
-import FormToggle from 'components/forms/form-toggle';
+import CompactFormToggle from 'components/forms/form-toggle/compact';
 import { getSelectedSiteId } from 'state/ui/selectors';
 import { isJetpackModuleActive } from 'state/selectors';
 import InfoPopover from 'components/info-popover';
@@ -29,18 +29,16 @@ class ThemeEnhancements extends Component {
 		return isRequestingSettings || isSavingSettings;
 	}
 
-	renderToggle( name, label ) {
+	renderToggle( name, isDisabled, label ) {
 		const { fields, handleToggle } = this.props;
 		return (
-			<FormToggle
-				className="theme-enhancements__module-settings-toggle is-compact"
+			<CompactFormToggle
 				checked={ !! fields[ name ] }
-				disabled={ this.isFormPending() }
-				onChange={ handleToggle( name ) }>
-				<span className="site-settings__toggle-label">
-					{ label }
-				</span>
-			</FormToggle>
+				disabled={ this.isFormPending() || isDisabled }
+				onChange={ handleToggle( name ) }
+			>
+				{ label }
+			</CompactFormToggle>
 		);
 	}
 
@@ -79,7 +77,7 @@ class ThemeEnhancements extends Component {
 
 		return (
 			<FormFieldset>
-				<div className="theme-enhancements__info-link-container">
+				<div className="theme-enhancements__info-link-container site-settings__info-link-container">
 					<InfoPopover position={ 'left' }>
 						<ExternalLink href={ 'https://jetpack.com/support/infinite-scroll' } target="_blank">
 							{ translate( 'Learn more about Infinite Scroll' ) }
@@ -94,22 +92,18 @@ class ThemeEnhancements extends Component {
 					disabled={ formPending }
 					/>
 
-				{
-					infiniteScrollModuleActive && (
-						<div className="theme-enhancements__module-settings is-indented">
-							{
-								this.renderToggle( 'infinite_scroll', translate(
-									'Scroll infinitely (Shows 7 posts on each load)'
-								) )
-							}
-							{
-								this.renderToggle( 'infinite_scroll_google_analytics', translate(
-									'Track each infinite Scroll post load as a page view in Google Analytics'
-								) )
-							}
-						</div>
-					)
-				}
+				<div className="theme-enhancements__module-settings site-settings__child-settings">
+					{
+						this.renderToggle( 'infinite_scroll', ! infiniteScrollModuleActive, translate(
+							'Scroll infinitely (Shows 7 posts on each load)'
+						) )
+					}
+					{
+						this.renderToggle( 'infinite_scroll_google_analytics', ! infiniteScrollModuleActive, translate(
+							'Track each infinite Scroll post load as a page view in Google Analytics'
+						) )
+					}
+				</div>
 			</FormFieldset>
 		);
 	}
@@ -124,7 +118,7 @@ class ThemeEnhancements extends Component {
 
 		return (
 			<FormFieldset>
-				<div className="theme-enhancements__info-link-container">
+				<div className="theme-enhancements__info-link-container site-settings__info-link-container">
 					<InfoPopover position={ 'left' }>
 						<ExternalLink href={ 'https://jetpack.com/support/mobile-theme' } target="_blank">
 							{ translate( 'Learn more about Mobile Theme' ) }
@@ -139,27 +133,28 @@ class ThemeEnhancements extends Component {
 					disabled={ formPending }
 					/>
 
-				{
-					minilevenModuleActive && (
-						<div className="theme-enhancements__module-settings is-indented">
+				<div className="theme-enhancements__module-settings site-settings__child-settings">
+					{
+						this.renderToggle( 'wp_mobile_excerpt', ! minilevenModuleActive, translate(
+							'Show excerpts on front page and on archive pages instead of full posts'
+						) )
+					}
+					{
+						this.renderToggle( 'wp_mobile_featured_images', ! minilevenModuleActive, translate(
+							'Hide all featured images'
+						) )
+					}
+					{
+						this.renderToggle( 'wp_mobile_app_promos', ! minilevenModuleActive, translate(
+							'Show an ad for the {{link}}WordPress mobile apps{{/link}} in the footer of the mobile theme',
 							{
-								this.renderToggle( 'wp_mobile_excerpt', translate(
-									'Show excerpts on front page and on archive pages instead of full posts'
-								) )
+								components: {
+									link: <a href="https://apps.wordpress.com/" />
+								}
 							}
-							{
-								this.renderToggle( 'wp_mobile_featured_images', translate(
-									'Hide all featured images'
-								) )
-							}
-							{
-								this.renderToggle( 'wp_mobile_app_promos', translate(
-									'Show an ad for the WordPress mobile apps in the footer of the mobile theme'
-								) )
-							}
-						</div>
-					)
-				}
+						) )
+					}
+				</div>
 			</FormFieldset>
 		);
 	}
@@ -171,6 +166,9 @@ class ThemeEnhancements extends Component {
 
 				<Card className="theme-enhancements__card site-settings">
 					{ this.renderInfiniteScrollSettings() }
+
+					<hr />
+
 					{ this.renderMinilevenSettings() }
 				</Card>
 			</div>
