@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { sortBy, toPairs, camelCase, mapKeys, isNumber, get, filter, map, concat, flatten } from 'lodash';
+import { sortBy, toPairs, camelCase, mapKeys, isNumber, get, filter, findIndex, forEach, map, concat, flatten } from 'lodash';
 import { moment, translate } from 'i18n-calypso';
 
 /**
@@ -102,6 +102,98 @@ export function buildExportArray( data, parent = null ) {
  */
 export function getSerializedStatsQuery( query = {} ) {
 	return JSON.stringify( sortBy( toPairs( query ), ( pair ) => pair[ 0 ] ) );
+}
+
+/**
+ * Return delta data in a format used by 'extensions/woocommerce/app/store-stats`. The fields array is matched to
+ * the data in a single object.
+ *
+ * @param {Object} payload - response
+ * @return {array} - Array of data objects
+ */
+function parseOrderDeltas( payload ) {
+	if ( ! payload || ! payload.deltas || ! payload.delta_fields ) {
+		return [];
+	}
+	const periodFieldIndex = findIndex( payload.delta_fields, ( field ) => field === 'period' );
+
+	const response = [];
+
+	forEach( payload.deltas, ( values, stat ) => {
+		values.forEach( row => {
+			const periodIndex = findIndex( response, ( item ) => item.period === row[ periodFieldIndex ] );
+			if ( periodIndex === -1 ) {
+				const newRow = { period: row[ periodFieldIndex ] };
+				newRow[ stat ] = {};
+				payload.delta_fields.forEach( ( value, index ) => {
+					newRow[ stat ][ value ] = row[ index ];
+				} );
+				response.push( newRow );
+			} else {
+				response[ periodIndex ][ stat ] = {};
+				payload.delta_fields.forEach( ( value, index ) => {
+					response[ periodIndex ][ stat ][ value ] = row[ index ];
+				} );
+			}
+		} );
+	} );
+
+	return response;
+}
+
+/**
+ * Return data in a format used by 'components/chart`. The fields array is matched to
+ * the data in a single object.
+ *
+ * @param {Object} payload - response
+ * @param {array} nullAttributes - properties on data objects to be initialized with
+ * a null value
+ * @return {array} - Array of data objects
+ */
+function parseChartData( payload, nullAttributes = [] ) {
+	if ( ! payload || ! payload.data ) {
+		return [];
+	}
+
+	return payload.data.map( function( record ) {
+		// Initialize data
+		const dataRecord = nullAttributes.reduce( ( memo, attribute ) => {
+			memo[ attribute ] = null;
+			return memo;
+		}, {} );
+
+		// Fill Field Values
+		record.forEach( function( value, i ) {
+			// Remove W from weeks
+			if ( 'period' === payload.fields[ i ] ) {
+				value = value.replace( /W/g, '-' );
+			}
+			dataRecord[ payload.fields[ i ] ] = value;
+		} );
+
+		dataRecord.labelDay = '';
+		dataRecord.labelWeek = '';
+		dataRecord.labelMonth = '';
+		dataRecord.labelYear = '';
+		dataRecord.classNames = [];
+
+		if ( dataRecord.period ) {
+			const date = moment( dataRecord.period, 'YYYY-MM-DD' ).locale( 'en' );
+			const localizedDate = moment( dataRecord.period, 'YYYY-MM-DD' );
+			if ( date.isValid() ) {
+				const dayOfWeek = date.toDate().getDay();
+				if ( ( 'day' === payload.unit ) && ( ( 6 === dayOfWeek ) || ( 0 === dayOfWeek ) ) ) {
+					dataRecord.classNames.push( 'is-weekend' );
+				}
+				dataRecord.labelDay = localizedDate.format( 'MMM D' );
+				dataRecord.labelWeek = localizedDate.format( 'MMM D' );
+				dataRecord.labelMonth = localizedDate.format( 'MMM' );
+				dataRecord.labelYear = localizedDate.format( 'YYYY' );
+			}
+		}
+
+		return dataRecord;
+	} );
 }
 
 export const normalizers = {
@@ -232,6 +324,7 @@ export const normalizers = {
 			// ’ in country names causes google's geo viz to break
 			return {
 				label: country.country_full.replace( /’/, "'" ),
+				countryCode: viewData.country_code,
 				value: viewData.views,
 				region: country.map_region,
 				backgroundImage: icon
@@ -620,51 +713,42 @@ export const normalizers = {
 	},
 
 	statsVisits( payload ) {
+		return parseChartData( payload, [ 'visits', 'likes', 'visitors', 'comments', 'posts' ] );
+	},
+
+	statsOrders( payload ) {
+		return {
+			data: parseChartData( payload ),
+			deltas: parseOrderDeltas( payload ),
+		};
+	},
+
+	statsTopSellers( payload ) {
 		if ( ! payload || ! payload.data ) {
 			return [];
 		}
+		return payload.data;
+	},
 
-		const attributes = [ 'visits', 'likes', 'visitors', 'comments', 'posts' ];
+	statsTopCategories( payload ) {
+		if ( ! payload || ! payload.data ) {
+			return [];
+		}
+		return payload.data;
+	},
 
-		return payload.data.map( function( record ) {
-			// Initialize data
-			const dataRecord = attributes.reduce( ( memo, attribute ) => {
-				memo[ attribute ] = null;
-				return memo;
-			}, {} );
+	statsTopCoupons( payload ) {
+		if ( ! payload || ! payload.data ) {
+			return [];
+		}
+		return payload.data;
+	},
 
-			// Fill Field Values
-			record.forEach( function( value, i ) {
-				// Remove W from weeks
-				if ( 'period' === payload.fields[ i ] ) {
-					value = value.replace( /W/g, '-' );
-				}
-				dataRecord[ payload.fields[ i ] ] = value;
-			} );
-
-			dataRecord.labelDay = '';
-			dataRecord.labelWeek = '';
-			dataRecord.labelMonth = '';
-			dataRecord.labelYear = '';
-			dataRecord.classNames = [];
-
-			if ( dataRecord.period ) {
-				const date = moment( dataRecord.period, 'YYYY-MM-DD' ).locale( 'en' );
-				const localizedDate = moment( dataRecord.period, 'YYYY-MM-DD' );
-				if ( date.isValid() ) {
-					const dayOfWeek = date.toDate().getDay();
-					if ( ( 'day' === payload.unit ) && ( ( 6 === dayOfWeek ) || ( 0 === dayOfWeek ) ) ) {
-						dataRecord.classNames.push( 'is-weekend' );
-					}
-					dataRecord.labelDay = localizedDate.format( 'MMM D' );
-					dataRecord.labelWeek = localizedDate.format( 'MMM D' );
-					dataRecord.labelMonth = localizedDate.format( 'MMM' );
-					dataRecord.labelYear = localizedDate.format( 'YYYY' );
-				}
-			}
-
-			return dataRecord;
-		} );
+	statsTopEarners( payload ) {
+		if ( ! payload || ! payload.data ) {
+			return [];
+		}
+		return payload.data;
 	},
 
 	/*

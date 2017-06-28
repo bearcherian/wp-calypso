@@ -2,7 +2,7 @@
  * External dependencies
  */
 import React, { PropTypes } from 'react';
-import { every, map } from 'lodash';
+import { map } from 'lodash';
 import { connect } from 'react-redux';
 
 /*
@@ -17,11 +17,12 @@ import { getFeed } from 'state/reader/feeds/selectors';
  * A HoC function that translates a postKey or postKeys into a post or posts for its child.
  */
 const fluxPostAdapter = Component => {
-
-	class ReaderPostFluxAdapter extends React.Component {
+	class ReaderPostFluxAdapter extends React.PureComponent {
 		static propTypes = {
 			postKey: PropTypes.object,
-			selectedPost: PropTypes.string
+			selectedPost: PropTypes.string,
+			feed: PropTypes.object,
+			site: PropTypes.object,
 		}
 
 		getStateFromStores = ( props = this.props ) => {
@@ -36,7 +37,7 @@ const fluxPostAdapter = Component => {
 						postKeyForPost.blogId = postKey.blogId;
 					}
 					postKeyForPost.postId = postId;
-					const post = FeedPostStore.get( postKeyForPost )
+					const post = FeedPostStore.get( postKeyForPost );
 					if ( ! post || post._state === 'minimal' ) {
 						fetchPost( postKeyForPost );
 					}
@@ -50,16 +51,6 @@ const fluxPostAdapter = Component => {
 		state = this.getStateFromStores( this.props );
 
 		updateState = ( newState = this.getStateFromStores() ) => {
-			// check to see if this new state is the same as the old state
-			if ( newState.posts.length === this.state.posts.length ) {
-				// same length, so they might be.
-				// check to see if the individual posts are equal
-				// since feed-post-store uses immutable posts, this is safe (and fast)
-				const current = this.state.posts;
-				if ( every( newState.posts, ( post, index ) => post === current[ index ] ) ) {
-					return;
-				}
-			}
 			this.setState( newState );
 		}
 

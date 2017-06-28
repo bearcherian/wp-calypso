@@ -4,10 +4,12 @@
 import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
 import { localize } from 'i18n-calypso';
+import classNames from 'classnames';
 
 /**
  * Internal dependencies
  */
+import config from 'config';
 import NoticeAction from 'components/notice/notice-action';
 import Notice from 'components/notice';
 import { getSelectedSiteId, getSelectedSite } from 'state/ui/selectors';
@@ -17,6 +19,7 @@ import { getPostType } from 'state/post-types/selectors';
 import QueryPostTypes from 'components/data/query-post-types';
 import { setLayoutFocus } from 'state/ui/layout-focus/actions';
 import { isMobile } from 'lib/viewport';
+import { isSitePreviewable } from 'state/sites/selectors';
 
 export class EditorNotice extends Component {
 	static propTypes = {
@@ -29,6 +32,8 @@ export class EditorNotice extends Component {
 		status: PropTypes.string,
 		action: PropTypes.string,
 		link: PropTypes.string,
+		onViewClick: PropTypes.func,
+		isPreviewable: PropTypes.bool,
 		onDismissClick: PropTypes.func,
 		error: PropTypes.object
 	}
@@ -86,9 +91,10 @@ export class EditorNotice extends Component {
 				}
 
 				if ( 'page' === type ) {
-					return translate( 'Page published on {{siteLink/}}!', {
+					return translate( 'Page published on {{siteLink/}}! {{a}}Add another page{{/a}}', {
 						components: {
-							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>
+							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>,
+							a: <a href={ `/page/${ site.slug }` } />,
 						},
 						comment: 'Editor: Message displayed when a page is published, with a link to the site it was published on.'
 					} );
@@ -111,9 +117,10 @@ export class EditorNotice extends Component {
 				}
 
 				if ( 'page' === type ) {
-					return translate( 'Page scheduled on {{siteLink/}}!', {
+					return translate( 'Page scheduled on {{siteLink/}}! {{a}}Add another page{{/a}}', {
 						components: {
-							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>
+							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>,
+							a: <a href={ `/page/${ site.slug }` } />,
 						},
 						comment: 'Editor: Message displayed when a page is scheduled, with a link to the site it was scheduled on.'
 					} );
@@ -127,6 +134,15 @@ export class EditorNotice extends Component {
 				} );
 
 			case 'publishedPrivately':
+				if ( config.isEnabled( 'post-editor/delta-post-publish-preview' ) ) {
+					return translate( '{{strong}}Published privately.{{/strong}} Only admins and editors can view.', {
+						components: {
+							strong: <strong />,
+						},
+						comment: 'Editor: Message displayed when a post is published privately.',
+					} );
+				}
+
 				if ( ! site ) {
 					if ( 'page' === type ) {
 						return translate( 'Page privately published!' );
@@ -136,9 +152,10 @@ export class EditorNotice extends Component {
 				}
 
 				if ( 'page' === type ) {
-					return translate( 'Page privately published on {{siteLink/}}!', {
+					return translate( 'Page privately published on {{siteLink/}}! {{a}}Add another page{{/a}}', {
 						components: {
-							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>
+							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>,
+							a: <a href={ `/page/${ site.slug }` } />,
 						},
 						comment: 'Editor: Message displayed when a page is published privately,' +
 							' with a link to the site it was published on.'
@@ -175,9 +192,10 @@ export class EditorNotice extends Component {
 				}
 
 				if ( 'page' === type ) {
-					return translate( 'Page updated on {{siteLink/}}!', {
+					return translate( 'Page updated on {{siteLink/}}! {{a}}Add another page{{/a}}', {
 						components: {
-							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>
+							siteLink: <a href={ site.URL } target="_blank" rel="noopener noreferrer">{ site.title }</a>,
+							a: <a href={ `/page/${ site.slug }` } />,
 						},
 						comment: 'Editor: Message displayed when a page is updated, with a link to the site it was updated on.'
 					} );
@@ -192,22 +210,46 @@ export class EditorNotice extends Component {
 		}
 	}
 
-	render() {
-		const { siteId, message, status, action, link, onDismissClick } = this.props;
-		const text = this.getErrorMessage() || this.getText( message );
+	renderNoticeAction() {
+		const {
+			action,
+			link,
+			isPreviewable,
+			onViewClick,
+		} = this.props;
+		if ( onViewClick && isPreviewable && link ) {
+			return (
+				<NoticeAction onClick={ onViewClick }>
+					{ this.getText( action ) }
+				</NoticeAction>
+			);
+		}
 
 		return (
-			<div className="editor-notice">
+			link && (
+				<NoticeAction href={ link } external>
+					{ this.getText( action ) }
+				</NoticeAction>
+			)
+		);
+	}
+
+	render() {
+		const { siteId, message, status, onDismissClick } = this.props;
+		const text = this.getErrorMessage() || this.getText( message );
+		const classes = classNames( 'editor-notice', {
+			'is-global': config.isEnabled( 'post-editor/delta-post-publish-preview' ),
+		} );
+
+		return (
+			<div className={ classes }>
 				{ siteId && <QueryPostTypes siteId={ siteId } /> }
 				{ text && (
 					<Notice
 						{ ...{ status, text, onDismissClick } }
-						showDismiss={ true }>
-						{ link && (
-							<NoticeAction href={ link } external>
-								{ this.getText( action ) }
-							</NoticeAction>
-						) }
+						showDismiss={ true }
+					>
+						{ this.renderNoticeAction() }
 					</Notice>
 				) }
 			</div>
@@ -226,6 +268,7 @@ export default connect( ( state ) => {
 		siteId,
 		site: getSelectedSite( state ),
 		type: post.type,
-		typeObject: getPostType( state, siteId, post.type )
+		typeObject: getPostType( state, siteId, post.type ),
+		isPreviewable: isSitePreviewable( state, siteId ),
 	};
 }, { setLayoutFocus } )( localize( EditorNotice ) );

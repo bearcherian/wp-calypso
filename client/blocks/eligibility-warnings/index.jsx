@@ -11,36 +11,37 @@ import Gridicon from 'gridicons';
 /**
  * Internal dependencies
  */
+import TrackComponentView from 'lib/analytics/track-component-view';
 import { PLAN_BUSINESS, FEATURE_UPLOAD_PLUGINS, FEATURE_UPLOAD_THEMES } from 'lib/plans/constants';
-import { isBusiness, isEnterprise } from 'lib/products-values';
+import { recordTracksEvent } from 'state/analytics/actions';
 import { getEligibility, isEligibleForAutomatedTransfer } from 'state/automated-transfer/selectors';
 import { isJetpackSite } from 'state/sites/selectors';
 import { getSelectedSite } from 'state/ui/selectors';
 import Banner from 'components/banner';
 import Button from 'components/button';
 import Card from 'components/card';
-import HoldList from './hold-list';
 import QueryEligibility from 'components/data/query-atat-eligibility';
+import HoldList from './hold-list';
 import WarningList from './warning-list';
 
 export const EligibilityWarnings = ( {
 	backUrl,
+	context,
 	eligibilityData,
 	hasBusinessPlan,
 	isEligible,
 	isJetpack,
 	isPlaceholder,
 	onProceed,
+	onCancel,
 	siteId,
 	siteSlug,
 	translate,
 } ) => {
-	const context = includes( backUrl, 'plugins' ) ? 'plugins' : 'themes';
-
 	const warnings = get( eligibilityData, 'eligibilityWarnings', [] );
 
 	const [ bannerHolds, listHolds ] = partition(
-		get( eligibilityData, 'eligibilityHolds', [ 'PLACEHOLDER', 'PLACEHOLDER' ] ),
+		get( eligibilityData, 'eligibilityHolds', [] ),
 		hold => includes( [ 'NO_BUSINESS_PLAN', 'NOT_USING_CUSTOM_DOMAIN' ], hold ),
 	);
 
@@ -52,35 +53,48 @@ export const EligibilityWarnings = ( {
 	return (
 		<div className={ classes }>
 			<QueryEligibility siteId={ siteId } />
-
-			{ 'plugins' === context && ! hasBusinessPlan && ! isJetpack &&
+			<TrackComponentView
+				eventName="calypso_automated_transfer_eligibility_show_warnings"
+				eventProperties={ { context } }
+			/>
+			{ ! hasBusinessPlan && ! isJetpack &&
 				<Banner
-					description={ translate( 'Please upgrade to install this plugin.' ) }
-					feature={ FEATURE_UPLOAD_PLUGINS }
+					description={ translate( 'Also get unlimited themes, advanced customization, no ads, live chat support, and more.' ) }
+					feature={ 'plugins' === context
+						? FEATURE_UPLOAD_PLUGINS
+						: FEATURE_UPLOAD_THEMES
+					}
+					event={ 'plugins' === context
+						? 'calypso-plugin-eligibility-upgrade-nudge'
+						: 'calypso-theme-eligibility-upgrade-nudge'
+					}
 					plan={ PLAN_BUSINESS }
 					title={ translate( 'Business plan required' ) }
-				/>
-			}
-			{ 'themes' === context && ! hasBusinessPlan && ! isJetpack &&
-				<Banner
-					description={ translate( 'Unlimited themes, advanced customization, no ads, live chat support, and more!' ) }
-					feature={ FEATURE_UPLOAD_THEMES }
-					plan={ PLAN_BUSINESS }
-					title={ translate( 'To upload themes, upgrade to Business Plan' ) }
 				/>
 			}
 			{ hasBusinessPlan && ! isJetpack && includes( bannerHolds, 'NOT_USING_CUSTOM_DOMAIN' ) &&
 				<Banner
 					className="eligibility-warnings__banner"
-					description={ translate( 'Add a free custom domain to install this plugin.' ) }
-					href={ `/domains/add/${ siteSlug }` }
+					description={ 'plugins' === context
+						? translate( 'To install this plugin, add a free custom domain.' )
+						: translate( 'To upload themes, add a free custom domain.' )
+					}
+					href={ `/domains/manage/${ siteSlug }` }
 					icon="domains"
 					title={ translate( 'Custom domain required' ) }
 				/>
 			}
 
-			{ listHolds.length > 0 && <HoldList holds={ listHolds } /> }
-			{ warnings.length > 0 && <WarningList warnings={ warnings } /> }
+			{ ( isPlaceholder || listHolds.length > 0 ) &&
+				<HoldList
+					holds={ listHolds }
+					isPlaceholder={ isPlaceholder }
+					siteSlug={ siteSlug }
+				/>
+			}
+			{ warnings.length > 0 &&
+				<WarningList warnings={ warnings } />
+			}
 
 			{ isEligible && 0 === listHolds.length && 0 === warnings.length &&
 				<Card className="eligibility-warnings__no-conflicts">
@@ -108,7 +122,7 @@ export const EligibilityWarnings = ( {
 					) }
 				</div>
 				<div className="eligibility-warnings__confirm-buttons">
-					<Button href={ backUrl }>
+					<Button href={ backUrl } onClick={ onCancel }>
 						{ translate( 'Cancel' ) }
 					</Button>
 
@@ -134,12 +148,12 @@ EligibilityWarnings.defaultProps = {
 const mapStateToProps = state => {
 	const {
 		ID: siteId,
-		plan,
 		slug: siteSlug,
 	} = getSelectedSite( state );
 	const eligibilityData = getEligibility( state, siteId );
 	const isEligible = isEligibleForAutomatedTransfer( state, siteId );
-	const hasBusinessPlan = isBusiness( plan ) || isEnterprise( plan );
+	const eligibilityHolds = get( eligibilityData, 'eligibilityHolds', [] );
+	const hasBusinessPlan = ! includes( eligibilityHolds, 'NO_BUSINESS_PLAN' );
 	const isJetpack = isJetpackSite( state, siteId );
 	const dataLoaded = !! eligibilityData.lastUpdate;
 
@@ -154,4 +168,19 @@ const mapStateToProps = state => {
 	};
 };
 
-export default connect( mapStateToProps )( localize( EligibilityWarnings ) );
+const mapDispatchToProps = {
+	trackCancel: ( eventProperties = {} ) => recordTracksEvent( 'calypso_automated_transfer_eligibility_click_cancel', eventProperties ),
+	trackProceed: ( eventProperties = {} ) => recordTracksEvent( 'calypso_automated_transfer_eligibilty_click_proceed', eventProperties ),
+};
+
+const mergeProps = ( stateProps, dispatchProps, ownProps ) => {
+	const context = includes( ownProps.backUrl, 'plugins' ) ? 'plugins' : 'themes';
+	const onCancel = () => dispatchProps.trackCancel( { context } );
+	const onProceed = () => {
+		ownProps.onProceed();
+		dispatchProps.trackProceed( { context } );
+	};
+	return Object.assign( {}, ownProps, stateProps, dispatchProps, { onCancel, onProceed, context } );
+};
+
+export default connect( mapStateToProps, mapDispatchToProps, mergeProps )( localize( EligibilityWarnings ) );

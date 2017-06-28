@@ -3,7 +3,7 @@
  */
 import { connect } from 'react-redux';
 import { flatten, find, isEmpty, isEqual, reduce, startsWith } from 'lodash';
-import i18n from 'i18n-calypso';
+import i18n, { localize } from 'i18n-calypso';
 import page from 'page';
 import React from 'react';
 
@@ -14,7 +14,7 @@ const analytics = require( 'lib/analytics' ),
 	cartItems = require( 'lib/cart-values' ).cartItems,
 	clearSitePlans = require( 'state/sites/plans/actions' ).clearSitePlans,
 	clearPurchases = require( 'state/purchases/actions' ).clearPurchases,
-	DomainDetailsForm = require( './domain-details-form' ),
+	DomainDetailsForm = require( './domain-details-form' ).default,
 	domainMapping = require( 'lib/cart-values/cart-items' ).domainMapping,
 	fetchReceiptCompleted = require( 'state/receipts/actions' ).fetchReceiptCompleted,
 	getExitCheckoutUrl = require( 'lib/checkout' ).getExitCheckoutUrl,
@@ -23,6 +23,7 @@ const analytics = require( 'lib/analytics' ),
 	observe = require( 'lib/mixins/data-observe' ),
 	purchasePaths = require( 'me/purchases/paths' ),
 	QueryStoredCards = require( 'components/data/query-stored-cards' ),
+	QueryGeo = require( 'components/data/query-geo' ),
 	SecurePaymentForm = require( './secure-payment-form' ),
 	SecurePaymentFormPlaceholder = require( './secure-payment-form-placeholder' ),
 	supportPaths = require( 'lib/url/support' ),
@@ -37,6 +38,11 @@ import {
 import { planItem as getCartItemForPlan } from 'lib/cart-values/cart-items';
 import { recordViewCheckout } from 'lib/analytics/ad-tracking';
 import { recordApplePayStatus } from 'lib/apple-pay';
+import { requestSite } from 'state/sites/actions';
+import {
+	isDomainOnlySite,
+	getCurrentUserPaymentMethods
+} from 'state/selectors';
 import {
 	getSelectedSite,
 	getSelectedSiteId,
@@ -44,12 +50,14 @@ import {
 } from 'state/ui/selectors';
 import { getDomainNameFromReceiptOrCart } from 'lib/domains/utils';
 import { fetchSitesAndUser } from 'lib/signup/step-actions';
+import { loadTrackingTool } from 'state/analytics/actions';
 
 const Checkout = React.createClass( {
 	mixins: [ observe( 'sites', 'productsList' ) ],
 
 	propTypes: {
 		cards: React.PropTypes.array.isRequired,
+		couponCode: React.PropTypes.string,
 		selectedFeature: React.PropTypes.string
 	},
 
@@ -59,7 +67,6 @@ const Checkout = React.createClass( {
 
 	componentWillMount: function() {
 		upgradesActions.resetTransaction();
-
 		this.props.recordApplePayStatus();
 	},
 
@@ -68,22 +75,21 @@ const Checkout = React.createClass( {
 			return;
 		}
 
+		if ( this.props.cart.hasLoadedFromServer ) {
+			this.trackPageView();
+		}
+
 		if ( this.props.cart.hasLoadedFromServer && this.props.product ) {
 			this.addProductToCart();
 		}
 
 		window.scrollTo( 0, 0 );
+		this.props.loadTrackingTool( 'HotJar' );
 	},
 
 	componentWillReceiveProps: function( nextProps ) {
 		if ( ! this.props.cart.hasLoadedFromServer && nextProps.cart.hasLoadedFromServer && this.props.product ) {
 			this.addProductToCart();
-		}
-
-		// Note that `hasPendingServerUpdates` will go from `null` to `false` on NUX checkout
-		// and from `true` to `false` on post-NUX checkout
-		if ( this.props.cart.hasPendingServerUpdates !== false && nextProps.cart.hasPendingServerUpdates === false ) {
-			this.trackPageView( nextProps );
 		}
 	},
 
@@ -112,8 +118,46 @@ const Checkout = React.createClass( {
 		recordViewCheckout( props.cart );
 	},
 
-	addProductToCart: function() {
-		const planSlug = getUpgradePlanSlugFromPath( this.props.product );
+	getProductSlugFromSynonym( slug ) {
+		if ( 'no-ads' === slug ) {
+			return 'no-adverts/no-adverts.php';
+		}
+		return slug;
+	},
+
+	addProductToCart() {
+		if ( this.props.purchaseId ) {
+			this.addRenewItemToCart();
+		} else {
+			this.addNewItemToCart();
+		}
+		if ( this.props.couponCode ) {
+			upgradesActions.applyCoupon( this.props.couponCode );
+		}
+	},
+
+	addRenewItemToCart() {
+		const { product, purchaseId, selectedSiteSlug } = this.props;
+		const [ slug, meta ] = product.split( ':' );
+		const productSlug = this.getProductSlugFromSynonym( slug );
+
+		if ( ! purchaseId ) {
+			return;
+		}
+
+		const cartItem = cartItems.getRenewalItemFromCartItem( {
+			meta,
+			product_slug: productSlug
+		}, {
+			id: purchaseId,
+			domain: selectedSiteSlug
+		} );
+
+		upgradesActions.addItem( cartItem );
+	},
+
+	addNewItemToCart() {
+		const planSlug = getUpgradePlanSlugFromPath( this.props.product, this.props.selectedSite );
 
 		let cartItem,
 			cartMeta;
@@ -224,12 +268,15 @@ const Checkout = React.createClass( {
 
 		const {
 			cart,
+			isDomainOnly,
+			reduxStore,
 			selectedSiteId,
 			transaction: {
 				step: {
 					data: receipt
 				}
-			}
+			},
+			translate
 		} = this.props;
 		const redirectPath = this.getCheckoutCompleteRedirectPath();
 
@@ -250,7 +297,7 @@ const Checkout = React.createClass( {
 
 			if ( product && product.will_auto_renew ) {
 				notices.success(
-					this.translate( '%(productName)s has been renewed and will now auto renew in the future. ' +
+					translate( '%(productName)s has been renewed and will now auto renew in the future. ' +
 						'{{a}}Learn more{{/a}}', {
 							args: {
 								productName: renewalItem.product_name
@@ -264,11 +311,11 @@ const Checkout = React.createClass( {
 				);
 			} else if ( product ) {
 				notices.success(
-					this.translate( 'Success! You renewed %(productName)s for %(duration)s, until %(date)s. ' +
+					translate( 'Success! You renewed %(productName)s for %(duration)s, until %(date)s. ' +
 						'We sent your receipt to %(email)s.', {
 							args: {
 								productName: renewalItem.product_name,
-								duration: i18n.moment.duration( renewalItem.bill_period, 'days' ).humanize(),
+								duration: i18n.moment.duration( { days: renewalItem.bill_period } ).humanize(),
 								date: i18n.moment( product.expiry ).format( 'MMM DD, YYYY' ),
 								email: product.user_email
 							}
@@ -291,17 +338,28 @@ const Checkout = React.createClass( {
 			} );
 		}
 
-		if ( cart.create_new_blog && receipt && isEmpty( receipt.failed_purchases ) ) {
+		if ( selectedSiteId ) {
+			this.props.requestSite( selectedSiteId );
+		}
+
+		if (
+			( cart.create_new_blog && receipt && isEmpty( receipt.failed_purchases ) ) ||
+			( isDomainOnly && cartItems.hasPlan( cart ) && ! selectedSiteId )
+		) {
 			notices.info(
-				this.translate( 'Almost done…' )
+				translate( 'Almost done…' )
 			);
 
 			const domainName = getDomainNameFromReceiptOrCart( receipt, cart );
 
 			if ( domainName ) {
-				fetchSitesAndUser( domainName, () => {
-					page( redirectPath );
-				} );
+				fetchSitesAndUser(
+					domainName,
+					() => {
+						page( redirectPath );
+					},
+					reduxStore
+				);
 
 				return;
 			}
@@ -332,6 +390,7 @@ const Checkout = React.createClass( {
 				cart={ this.props.cart }
 				transaction={ this.props.transaction }
 				cards={ this.props.cards }
+				paymentMethods={ this.props.paymentMethods }
 				products={ this.props.productsList.get() }
 				selectedSite={ selectedSite }
 				redirectTo={ this.getCheckoutCompleteRedirectPath }
@@ -365,6 +424,7 @@ const Checkout = React.createClass( {
 			<div className="main main-column" role="main">
 				<div className="checkout">
 					<QueryStoredCards />
+					<QueryGeo />
 
 					{ this.content() }
 				</div>
@@ -379,6 +439,8 @@ module.exports = connect(
 
 		return {
 			cards: getStoredCards( state ),
+			paymentMethods: getCurrentUserPaymentMethods( state ),
+			isDomainOnly: isDomainOnlySite( state, selectedSiteId ),
 			selectedSite: getSelectedSite( state ),
 			selectedSiteId,
 			selectedSiteSlug: getSelectedSiteSlug( state ),
@@ -388,6 +450,8 @@ module.exports = connect(
 		clearPurchases,
 		clearSitePlans,
 		fetchReceiptCompleted,
-		recordApplePayStatus
+		recordApplePayStatus,
+		requestSite,
+		loadTrackingTool
 	}
-)( Checkout );
+)( localize( Checkout ) );

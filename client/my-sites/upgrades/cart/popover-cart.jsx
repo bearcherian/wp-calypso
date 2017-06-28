@@ -14,10 +14,12 @@ import CartBody from './cart-body';
 import CartBodyLoadingPlaceholder from './cart-body/loading-placeholder';
 import CartMessagesMixin from './cart-messages-mixin';
 import CartButtons from './cart-buttons';
+import Count from 'components/count';
 import Popover from 'components/popover';
 import CartEmpty from './cart-empty';
 import CartPlanAd from './cart-plan-ad';
 import { isCredits } from 'lib/products-values';
+import TrackComponentView from 'lib/analytics/track-component-view';
 
 const PopoverCart = React.createClass( {
 	propTypes: {
@@ -45,14 +47,19 @@ const PopoverCart = React.createClass( {
 	mixins: [ CartMessagesMixin ],
 
 	render: function() {
-		var countBadge,
-			classes = classNames( {
-				'popover-cart': true,
-				pinned: this.props.pinned
-			} );
+		let countBadge;
+		const	classes = classNames( {
+			'popover-cart': true,
+			pinned: this.props.pinned
+		} );
 
 		if ( this.itemCount() ) {
-			countBadge = <div className="popover-cart__count-badge">{ this.itemCount() }</div>;
+			countBadge = (
+				<div className="cart__count-badge count-badge-pulsing">
+					<Count primary count={ this.itemCount() } />
+					<TrackComponentView eventName="calypso_popover_cart_badge_impression" />
+				</div>
+			);
 		}
 
 		return (
@@ -81,6 +88,9 @@ const PopoverCart = React.createClass( {
 						onClose={ this.onClose }
 						context={ this.refs.toggleButton }>
 					{ this.cartBody() }
+				<TrackComponentView
+					eventName="calypso_popover_cart_content_impression"
+					eventProperties={ { style: 'popover' } } />
 				</Popover>
 			);
 		}
@@ -89,6 +99,9 @@ const PopoverCart = React.createClass( {
 				<div className="popover-cart__mobile-cart">
 					<div className="top-arrow"></div>
 					{ this.cartBody() }
+					<TrackComponentView
+						eventName="calypso_popover_cart_content_impression"
+						eventProperties={ { style: 'mobile-cart' } } />
 				</div>
 			);
 		}

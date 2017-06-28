@@ -12,12 +12,13 @@ import {
 	ACTIVE_THEME_REQUEST,
 	ACTIVE_THEME_REQUEST_SUCCESS,
 	ACTIVE_THEME_REQUEST_FAILURE,
-	THEME_ACTIVATE_REQUEST,
-	THEME_ACTIVATE_REQUEST_SUCCESS,
-	THEME_ACTIVATE_REQUEST_FAILURE,
+	THEME_ACTIVATE,
+	THEME_ACTIVATE_SUCCESS,
+	THEME_ACTIVATE_FAILURE,
 	THEME_CLEAR_ACTIVATED,
 	THEME_DELETE_SUCCESS,
 	THEME_DELETE_FAILURE,
+	THEME_FILTERS_REQUEST,
 	THEME_INSTALL,
 	THEME_INSTALL_SUCCESS,
 	THEME_INSTALL_FAILURE,
@@ -51,6 +52,7 @@ import {
 	tryAndCustomizeTheme,
 	tryAndCustomize,
 	deleteTheme,
+	requestThemeFilters,
 } from '../actions';
 import useNock from 'test/helpers/use-nock';
 import ThemeQueryManager from 'lib/query-manager/theme';
@@ -405,6 +407,7 @@ describe( 'actions', () => {
 								properties: {
 									previous_theme: 'twentyfifteen',
 									purchased: false,
+									search_taxonomies: '',
 									search_term: 'simple, white',
 									source: 'unknown',
 									theme: 'twentysixteen',
@@ -415,7 +418,7 @@ describe( 'actions', () => {
 						},
 					],
 				},
-				type: THEME_ACTIVATE_REQUEST_SUCCESS,
+				type: THEME_ACTIVATE_SUCCESS,
 				themeStylesheet: 'pub/twentysixteen',
 				siteId: 2211667,
 			};
@@ -473,7 +476,7 @@ describe( 'actions', () => {
 			activateTheme( 'twentysixteen', 2211667 )( spy );
 
 			expect( spy ).to.have.been.calledWith( {
-				type: THEME_ACTIVATE_REQUEST,
+				type: THEME_ACTIVATE,
 				siteId: 2211667,
 				themeId: 'twentysixteen',
 			} );
@@ -490,7 +493,7 @@ describe( 'actions', () => {
 				error: sinon.match( { message: 'The specified theme was not found' } ),
 				siteId: 2211667,
 				themeId: 'badTheme',
-				type: THEME_ACTIVATE_REQUEST_FAILURE
+				type: THEME_ACTIVATE_FAILURE
 			};
 
 			return activateTheme( 'badTheme', 2211667, trackingData )( spy ).then( () => {
@@ -729,7 +732,7 @@ describe( 'actions', () => {
 		it( 'should dispatch status update', () => {
 			return pollThemeTransferStatus( siteId, 3, 20 )( spy ).then( () => {
 				// Two 'progress' then a 'complete'
-				expect( spy ).to.have.been.calledThrice;
+				expect( spy ).to.have.callCount( 4 );
 				expect( spy ).to.have.been.calledWith( {
 					type: THEME_TRANSFER_STATUS_RECEIVE,
 					siteId: siteId,
@@ -777,11 +780,13 @@ describe( 'actions', () => {
 				expect( spy ).to.have.been.calledThrice;
 
 				expect( spy ).to.have.been.calledWith( {
+					meta: sinon.match.object,
 					type: THEME_TRANSFER_INITIATE_REQUEST,
 					siteId,
 				} );
 
 				expect( spy ).to.have.been.calledWith( {
+					meta: sinon.match.object,
 					type: THEME_TRANSFER_INITIATE_SUCCESS,
 					siteId,
 					transferId: 1,
@@ -1062,6 +1067,13 @@ describe( 'actions', () => {
 					} );
 				} );
 			} );
+		} );
+	} );
+
+	describe( '#requestThemeFilters', () => {
+		it( 'should return THEME_FILTERS_REQUEST action', () => {
+			const action = requestThemeFilters();
+			expect( action ).to.deep.equal( { type: THEME_FILTERS_REQUEST } );
 		} );
 	} );
 } );

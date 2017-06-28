@@ -6,7 +6,6 @@ import debugFactory from 'debug';
 import { localize } from 'i18n-calypso';
 import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
-import { get } from 'lodash';
 import Gridicon from 'gridicons';
 
 /**
@@ -26,15 +25,28 @@ import SidebarItem from 'layout/sidebar/item';
 import SidebarMenu from 'layout/sidebar/menu';
 import SidebarRegion from 'layout/sidebar/region';
 import StatsSparkline from 'blocks/stats-sparkline';
+import JetpackLogo from 'components/jetpack-logo';
 import { isPersonal, isPremium, isBusiness } from 'lib/products-values';
 import { getCurrentUser } from 'state/current-user/selectors';
 import { getSelectedSiteId } from 'state/ui/selectors';
+import { getCurrentLayoutFocus } from 'state/ui/layout-focus/selectors';
 import { setNextLayoutFocus, setLayoutFocus } from 'state/ui/layout-focus/actions';
-import { userCan } from 'lib/site/utils';
-import { isDomainOnlySite } from 'state/selectors';
-import { getCustomizerUrl, isJetpackSite } from 'state/sites/selectors';
-import isSiteAutomatedTransfer from 'state/selectors/is-site-automated-transfer';
+import {
+	canCurrentUser,
+	getPrimarySiteId,
+	getSites,
+	isDomainOnlySite,
+	isSiteAutomatedTransfer
+} from 'state/selectors';
+import {
+	getCustomizerUrl,
+	getSite,
+	isJetpackMinimumVersion,
+	isJetpackModuleActive,
+	isJetpackSite
+} from 'state/sites/selectors';
 import { getStatsPathForTab } from 'lib/route/path';
+import { abtest } from 'lib/abtest';
 
 /**
  * Module variables
@@ -47,7 +59,6 @@ export class MySitesSidebar extends Component {
 		setNextLayoutFocus: PropTypes.func.isRequired,
 		setLayoutFocus: PropTypes.func.isRequired,
 		path: PropTypes.string,
-		sites: PropTypes.object,
 		currentUser: PropTypes.object,
 		isDomainOnly: PropTypes.bool,
 		isJetpack: PropTypes.bool,
@@ -64,7 +75,8 @@ export class MySitesSidebar extends Component {
 	};
 
 	onPreviewSite = ( event ) => {
-		const site = this.getSelectedSite();
+		const { site } = this.props;
+		analytics.ga.recordEvent( 'Sidebar', 'Clicked View Site' );
 		if ( site.is_previewable && ! event.metaKey && ! event.ctrlKey ) {
 			event.preventDefault();
 			this.props.setLayoutFocus( 'preview' );
@@ -90,6 +102,10 @@ export class MySitesSidebar extends Component {
 	};
 
 	isItemLinkSelected( paths ) {
+		if ( this.props.isPreviewShowing ) {
+			return false;
+		}
+
 		if ( ! Array.isArray( paths ) ) {
 			paths = [ paths ];
 		}
@@ -99,84 +115,64 @@ export class MySitesSidebar extends Component {
 		}, this );
 	}
 
-	isSingle() {
-		return !! ( this.props.sites.getSelectedSite() || this.props.sites.get().length === 1 );
-	}
-
-	getSingleSiteDomain() {
-		if ( this.props.sites.selected ) {
-			return this.getSelectedSite().slug;
-		}
-
-		return this.props.sites.getPrimary().slug;
-	}
-
-	getSelectedSite() {
-		if ( this.props.sites.get().length === 1 ) {
-			return this.props.sites.getPrimary();
-		}
-
-		return this.props.sites.getSelectedSite();
-	}
-
-	hasJetpackSites() {
-		return this.props.sites.get().some( function( site ) {
-			return site.jetpack;
-		} );
-	}
-
-	siteSuffix() {
-		return this.isSingle() ? '/' + this.getSingleSiteDomain() : '';
-	}
-
 	publish() {
 		return (
-			<PublishMenu site={ this.getSelectedSite() }
-				sites={ this.props.sites }
-				siteSuffix={ this.siteSuffix() }
-				isSingle={ this.isSingle() }
+			<PublishMenu siteId={ this.props.siteId }
 				itemLinkClass={ this.itemLinkClass }
 				onNavigate={ this.onNavigate } />
 		);
 	}
 
 	stats() {
-		const site = this.getSelectedSite();
+		const { siteId, canUserViewStats } = this.props;
 
-		if ( site && ! site.capabilities ) {
+		if ( siteId && ! canUserViewStats ) {
 			return null;
 		}
 
-		if ( site && site.capabilities && ! site.capabilities.view_stats ) {
-			return null;
-		}
-
-		const siteId = this.isSingle() ? site.slug : null;
 		const statsLink = getStatsPathForTab( 'day', siteId );
 		return (
 			<SidebarItem
 				tipTarget="menus"
 				label={ this.props.translate( 'Stats' ) }
-				className={ this.itemLinkClass( '/stats', 'stats' ) }
+				className={ this.itemLinkClass( [ '/stats', '/store/stats' ], 'stats' ) }
 				link={ statsLink }
 				onNavigate={ this.onNavigate }
 				icon="stats-alt">
 				<a href={ statsLink }>
-					<StatsSparkline className="sidebar__sparkline" siteId={ get( site, 'ID' ) } />
+					<StatsSparkline className="sidebar__sparkline" siteId={ siteId } />
 				</a>
 			</SidebarItem>
 		);
 	}
 
+	preview() {
+		if ( ! this.props.siteId ) {
+			return null;
+		}
+
+		return (
+			<SidebarItem
+				tipTarget="sitePreview"
+				label={ this.props.translate( 'View Site' ) }
+				className={ this.itemLinkClass( [ '/view' ], 'preview' ) }
+				link={ '/view' + this.props.siteSuffix }
+				onNavigate={ this.onNavigate }
+				icon="computer"
+				preloadSectionName="preview"
+			/>
+		);
+	}
+
 	ads() {
-		const site = this.getSelectedSite();
-		const adsLink = '/ads/earnings' + this.siteSuffix();
-		const canManageAds = site && site.options.wordads && userCan( 'manage_options', site );
+		const { site, canUserManageOptions } = this.props;
+		const adsLink = '/ads/earnings' + this.props.siteSuffix;
+		const canManageAds = site && site.options.wordads && canUserManageOptions;
 
 		return (
 			canManageAds &&
 			<SidebarItem
-				label={ site.jetpack ? 'Ads' : 'WordAds' }
+				label={ this.props.isJetpack ? 'Ads' : 'WordAds' }
 				className={ this.itemLinkClass( '/ads', 'rads' ) }
 				link={ adsLink }
 				onNavigate={ this.onNavigate }
@@ -185,11 +181,11 @@ export class MySitesSidebar extends Component {
 	}
 
 	themes() {
-		var site = this.getSelectedSite(),
-			jetpackEnabled = config.isEnabled( 'manage/themes-jetpack' ),
-			themesLink;
+		const { site, canUserEditThemeOptions } = this.props,
+			jetpackEnabled = config.isEnabled( 'manage/themes-jetpack' );
+		let themesLink;
 
-		if ( site && ! site.isCustomizable() ) {
+		if ( site && ! canUserEditThemeOptions ) {
 			return null;
 		}
 
@@ -197,19 +193,19 @@ export class MySitesSidebar extends Component {
 			return null;
 		}
 
-		if ( site.jetpack && ! jetpackEnabled && site.options ) {
+		if ( this.props.isJetpack && ! jetpackEnabled && site.options ) {
 			themesLink = site.options.admin_url + 'themes.php';
-		} else if ( this.isSingle() ) {
-			themesLink = '/design' + this.siteSuffix();
+		} else if ( this.props.siteId ) {
+			themesLink = '/themes' + this.props.siteSuffix;
 		} else {
-			themesLink = '/design';
+			themesLink = '/themes';
 		}
 
 		return (
 			<SidebarItem
 				label={ this.props.translate( 'Themes' ) }
 				tipTarget="themes"
-				className={ this.itemLinkClass( '/design', 'themes' ) }
+				className={ this.itemLinkClass( '/themes', 'themes' ) }
 				link={ themesLink }
 				onNavigate={ this.onNavigate }
 				icon="themes"
@@ -222,54 +218,14 @@ export class MySitesSidebar extends Component {
 		);
 	}
 
-	menus() {
-		var site = this.getSelectedSite(),
-			menusLink = '/menus' + this.siteSuffix(),
-			showClassicLink = ! config.isEnabled( 'manage/menus' );
-
-		if ( ! site ) {
-			return null;
-		}
-
-		if ( ! site.capabilities ) {
-			return null;
-		}
-
-		if ( site.capabilities && ! site.capabilities.edit_theme_options ) {
-			return null;
-		}
-
-		if ( ! this.isSingle() ) {
-			return null;
-		}
-
-		if ( showClassicLink ) {
-			menusLink = site.options.admin_url + 'nav-menus.php';
-		}
-
-		return (
-			<SidebarItem
-				tipTarget="menus"
-				label={ this.props.translate( 'Menus' ) }
-				className={ this.itemLinkClass( '/menus', 'menus' ) }
-				link={ menusLink }
-				onNavigate={ this.onNavigate }
-				icon="menus"
-				preloadSectionName="menus" />
-		);
-	}
-
 	plugins() {
-		var site = this.getSelectedSite(),
-			pluginsLink = '/plugins' + this.siteSuffix(),
-			addPluginsLink;
+		const { site } = this.props;
+		const addPluginsLink = '/plugins/browse' + this.props.siteSuffix;
+		let pluginsLink = '/plugins' + this.props.siteSuffix;
 
-		if ( config.isEnabled( 'automated-transfer' ) ) {
-			addPluginsLink = '/plugins/browse' + this.siteSuffix();
-		}
-
+		// TODO: we can probably rip this out
 		if ( ! config.isEnabled( 'manage/plugins' ) ) {
-			if ( ! this.isSingle() ) {
+			if ( ! site ) {
 				return null;
 			}
 
@@ -278,12 +234,14 @@ export class MySitesSidebar extends Component {
 			}
 		}
 
-		if ( ! this.props.sites.canManageSelectedOrAll() ) {
+		// checks for manage plugins capability across all sites
+		if ( ! this.props.canManagePlugins ) {
 			return null;
 		}
 
-		if ( ( this.isSingle() && site.jetpack ) || ( ! this.isSingle() && this.hasJetpackSites() ) ) {
-			addPluginsLink = '/plugins/browse' + this.siteSuffix();
+		// if selectedSite and cannot manage, skip plugins section
+		if ( this.props.siteId && ! this.props.canUserManageOptions ) {
+			return null;
 		}
 
 		return (
@@ -303,27 +261,19 @@ export class MySitesSidebar extends Component {
 	}
 
 	upgrades() {
-		var site = this.getSelectedSite(),
-			domainsLink = '/domains/manage' + this.siteSuffix(),
-			addDomainLink = '/domains/add' + this.siteSuffix();
+		const { canUserManageOptions } = this.props;
+		const domainsLink = '/domains/manage' + this.props.siteSuffix;
+		const addDomainLink = '/domains/add' + this.props.siteSuffix;
 
-		if ( ! config.isEnabled( 'manage/plans' ) ) {
+		if ( ! this.props.siteId ) {
 			return null;
 		}
 
-		if ( ! this.isSingle() ) {
+		if ( ! canUserManageOptions ) {
 			return null;
 		}
 
-		if ( ! site.capabilities ) {
-			return null;
-		}
-
-		if ( site.capabilities && ! site.capabilities.manage_options ) {
-			return null;
-		}
-
-		if ( site.jetpack && ! ( config.isEnabled( 'automated-transfer' ) ) ) {
+		if ( this.props.isJetpack && ! this.props.isSiteAutomatedTransfer ) {
 			return null;
 		}
 
@@ -333,7 +283,7 @@ export class MySitesSidebar extends Component {
 				className={ this.itemLinkClass( [ '/domains' ], 'domains' ) }
 				link={ domainsLink }
 				onNavigate={ this.onNavigate }
-				icon="globe"
+				icon="domains"
 				preloadSectionName="upgrades"
 			>
 				<SidebarButton href={ addDomainLink }>
@@ -344,43 +294,32 @@ export class MySitesSidebar extends Component {
 	}
 
 	plan() {
-		if ( ! config.isEnabled( 'manage/plans' ) ) {
+		const { site, canUserManageOptions } = this.props;
+
+		if ( ! site ) {
 			return null;
 		}
 
-		if ( ! this.isSingle() ) {
+		if ( ! canUserManageOptions ) {
 			return null;
 		}
 
-		const site = this.getSelectedSite();
-
-		if ( ! site.capabilities ) {
-			return null;
-		}
-
-		if ( site.capabilities && ! site.capabilities.manage_options ) {
-			return null;
-		}
-
-		let planLink = '/plans' + this.siteSuffix();
+		let planLink = '/plans' + this.props.siteSuffix;
 
 		// Show plan details for upgraded sites
-		if (
-			site &&
-			( isPersonal( site.plan ) || isPremium( site.plan ) || isBusiness( site.plan ) )
-		) {
-			planLink = '/plans/my-plan' + this.siteSuffix();
+		if ( isPersonal( site.plan ) || isPremium( site.plan ) || isBusiness( site.plan ) ) {
+			planLink = '/plans/my-plan' + this.props.siteSuffix;
 		}
 
 		let linkClass = 'upgrades-nudge';
 
-		if ( productsValues.isPlan( site.plan ) ) {
+		if ( site && productsValues.isPlan( site.plan ) ) {
 			linkClass += ' is-paid-plan';
 		}
 
-		let planName = site.plan.product_name_short;
+		let planName = site && site.plan.product_name_short;
 
-		if ( productsValues.isFreeTrial( site.plan ) ) {
+		if ( site && productsValues.isFreeTrial( site.plan ) ) {
 			planName = this.props.translate( 'Trial', {
 				context: 'Label in the sidebar indicating that the user is on the free trial for a plan.'
 			} );
@@ -389,11 +328,36 @@ export class MySitesSidebar extends Component {
 		return (
 			<li className={ this.itemLinkClass( [ '/plans' ], linkClass ) }>
 				<a onClick={ this.trackUpgradeClick } href={ planLink }>
-					<Gridicon icon="clipboard" size={ 24 } />
+					<JetpackLogo size={ 24 } />
 					<span className="menu-link-text">{ this.props.translate( 'Plan', { context: 'noun' } ) }</span>
 				</a>
 				<a href={ planLink } className="plan-name" onClick={ this.trackUpgradeClick }>{ planName }</a>
 			</li>
+		);
+	}
+
+	trackStoreClick = () => {
+		analytics.tracks.recordEvent( 'calypso_woocommerce_store_nav_item_click' );
+		this.onNavigate();
+	};
+
+	store() {
+		const { canUserManageOptions, isJetpack, site, siteSuffix, translate } = this.props;
+		const storeLink = '/store' + siteSuffix;
+		const showStoreLink = config.isEnabled( 'woocommerce/extension-dashboard' ) &&
+			site && isJetpack && canUserManageOptions;
+
+		return (
+			showStoreLink &&
+			<SidebarItem
+				label={ translate( 'Store (BETA)' ) }
+				link={ storeLink }
+				onNavigate={ this.trackStoreClick }
+				icon="cart" >
+				<SidebarButton href={ storeLink }>
+					{ translate( 'Set up' ) }
+				</SidebarButton>
+			</SidebarItem>
 		);
 	}
 
@@ -405,26 +369,18 @@ export class MySitesSidebar extends Component {
 	};
 
 	sharing() {
-		var site = this.getSelectedSite(),
-			sharingLink = '/sharing' + this.siteSuffix();
+		const { isJetpack, isSharingEnabledOnJetpackSite, site } = this.props;
+		const sharingLink = '/sharing' + this.props.siteSuffix;
 
-		if ( ! site.capabilities ) {
+		if ( site && ! this.props.canUserPublishPosts ) {
 			return null;
 		}
 
-		if (
-			site.jetpack &&
-			! site.isModuleActive( 'publicize' ) &&
-			( ! site.isModuleActive( 'sharedaddy' ) || site.versionCompare( '3.4-dev', '<' ) )
-		) {
+		if ( ! this.props.siteId ) {
 			return null;
 		}
 
-		if ( site.capabilities && ! site.capabilities.publish_posts ) {
-			return null;
-		}
-
-		if ( ! this.isSingle() ) {
+		if ( isJetpack && ! isSharingEnabledOnJetpackSite ) {
 			return null;
 		}
 
@@ -440,30 +396,20 @@ export class MySitesSidebar extends Component {
 	}
 
 	users() {
-		var site = this.getSelectedSite(),
-			usersLink = '/people/team' + this.siteSuffix(),
-			addPeopleLink = '/people/new' + this.siteSuffix();
+		const { site, canUserListUsers } = this.props;
+		let usersLink = '/people/team' + this.props.siteSuffix;
+		const addPeopleLink = '/people/new' + this.props.siteSuffix;
 
-		if ( ! site.capabilities ) {
+		if ( ! site ) {
 			return null;
 		}
 
-		if ( site.capabilities && ! site.capabilities.list_users ) {
-			return null;
-		}
-
-		if ( ! this.isSingle() ) {
+		if ( ! canUserListUsers ) {
 			return null;
 		}
 
 		if ( ! config.isEnabled( 'manage/people' ) && site.options ) {
 			usersLink = site.options.admin_url + 'users.php';
-		}
-
-		if ( site.options && site.jetpack ) {
-			addPeopleLink = ( site.jetpack )
-				? site.options.admin_url + 'user-new.php'
-				: site.options.admin_url + 'users.php?page=wpcom-invite-users';
 		}
 
 		return (
@@ -483,18 +429,14 @@ export class MySitesSidebar extends Component {
 	}
 
 	siteSettings() {
-		var site = this.getSelectedSite(),
-			siteSettingsLink = '/settings/general' + this.siteSuffix();
+		const { site, canUserManageOptions } = this.props;
+		const siteSettingsLink = '/settings/general' + this.props.siteSuffix;
 
-		if ( ! site.capabilities ) {
+		if ( site && ! canUserManageOptions ) {
 			return null;
 		}
 
-		if ( site.capabilities && ! site.capabilities.manage_options ) {
-			return null;
-		}
-
-		if ( ! this.isSingle() ) {
+		if ( ! this.props.siteId ) {
 			return null;
 		}
 
@@ -511,9 +453,9 @@ export class MySitesSidebar extends Component {
 	}
 
 	wpAdmin() {
-		var site = this.getSelectedSite();
+		const { site } = this.props;
 
-		if ( ! site.options ) {
+		if ( ! site || ! site.options ) {
 			return null;
 		}
 
@@ -539,13 +481,13 @@ export class MySitesSidebar extends Component {
 
 	// Check for cases where WP Admin links should appear, where we need support for legacy reasons (VIP, older users, testing).
 	useWPAdminFlows() {
-		const site = this.getSelectedSite();
+		const { site } = this.props;
 		const currentUser = this.props.currentUser;
 		const userRegisteredDate = new Date( currentUser.date );
 		const cutOffDate = new Date( '2015-09-07' );
 
 		// VIP sites should always show a WP Admin link regardless of the current user.
-		if ( site.is_vip ) {
+		if ( site && site.is_vip ) {
 			return true;
 		}
 
@@ -565,6 +507,14 @@ export class MySitesSidebar extends Component {
 		this.props.setLayoutFocus( 'content' );
 	};
 
+	getAddNewSiteUrl() {
+		if ( this.props.hasJetpackSites ||
+			abtest( 'newSiteWithJetpack' ) === 'showNewJetpackSite' ) {
+			return '/jetpack/new/?ref=calypso-selector';
+		}
+		return config( 'signup_url' ) + '?ref=calypso-selector';
+	}
+
 	addNewSite() {
 		if ( this.props.currentUser.visible_site_count > 1 ) {
 			return null;
@@ -573,7 +523,7 @@ export class MySitesSidebar extends Component {
 		return (
 			<Button borderless
 				className="my-sites-sidebar__add-new-site"
-				href={ config( 'signup_url' ) + '?ref=calypso-selector' }
+				href={ this.getAddNewSiteUrl() }
 				onClick={ this.focusContent }
 			>
 				<Gridicon icon="add-outline" /> { this.props.translate( 'Add New Site' ) }
@@ -590,7 +540,7 @@ export class MySitesSidebar extends Component {
 							className={ this.itemLinkClass( '/domains', 'settings' ) }
 							icon="cog"
 							label={ this.props.translate( 'Settings' ) }
-							link={ '/domains/manage' + this.siteSuffix() }
+							link={ '/domains/manage' + this.props.siteSuffix }
 							onNavigate={ this.onNavigate } />
 					</ul>
 				</SidebarMenu>
@@ -598,15 +548,16 @@ export class MySitesSidebar extends Component {
 		}
 
 		const publish = !! this.publish(),
-			appearance = ( !! this.themes() || !! this.menus() ),
 			configuration = ( !! this.sharing() || !! this.users() || !! this.siteSettings() || !! this.plugins() || !! this.upgrades() );
 
 		return (
 			<div>
 				<SidebarMenu>
 					<ul>
+						{ config.isEnabled( 'standalone-site-preview' ) && this.preview() }
 						{ this.stats() }
 						{ this.plan() }
+						{ this.store() }
 					</ul>
 				</SidebarMenu>
 
@@ -618,12 +569,11 @@ export class MySitesSidebar extends Component {
 					: null
 				}
 
-				{ appearance
+				{ !! this.themes()
 					? <SidebarMenu>
 						<SidebarHeading>{ this.props.translate( 'Personalize' ) }</SidebarHeading>
 						<ul>
 							{ this.themes() }
-							{ this.menus() }
 						</ul>
 					</SidebarMenu>
 					: null
@@ -653,8 +603,8 @@ export class MySitesSidebar extends Component {
 			<Sidebar>
 				<SidebarRegion>
 					<CurrentSite
-						sites={ this.props.sites }
-						siteCount={ this.props.currentUser.visible_site_count }
+						allSitesPath={ this.props.allSitesPath }
+						isPreviewShowing={ this.props.isPreviewShowing }
 						onClick={ this.onPreviewSite }
 					/>
 					{ this.renderSidebarMenus() }
@@ -668,13 +618,46 @@ export class MySitesSidebar extends Component {
 }
 
 function mapStateToProps( state ) {
+	const currentUser = getCurrentUser( state );
 	const selectedSiteId = getSelectedSiteId( state );
+	const isSingleSite = !! selectedSiteId || currentUser.site_count === 1;
+	const siteId = selectedSiteId || ( isSingleSite && getPrimarySiteId( state ) ) || null;
+	const site = getSite( state, siteId );
+
+	const isJetpack = isJetpackSite( state, siteId );
+	// FIXME: Fun with Boolean algebra :-)
+	const isSharingEnabledOnJetpackSite = ! (
+		! isJetpackModuleActive( state, siteId, 'publicize' ) &&
+		( ! isJetpackModuleActive( state, siteId, 'sharedaddy' ) || isJetpackMinimumVersion( state, siteId, '3.4-dev' ) )
+	);
+	// FIXME: Turn into dedicated selector
+	const canManagePlugins = !! getSites( state ).some( ( s ) => (
+		( s.capabilities && s.capabilities.manage_options )
+	) );
+
+	// FIXME: Turn into dedicated selector
+	const hasJetpackSites = getSites( state ).some( s => s.jetpack );
+
+	const isPreviewShowing = getCurrentLayoutFocus( state ) === 'preview';
+
 	return {
-		currentUser: getCurrentUser( state ),
+		canManagePlugins,
+		canUserEditThemeOptions: canCurrentUser( state, siteId, 'edit_theme_options' ),
+		canUserListUsers: canCurrentUser( state, siteId, 'list_users' ),
+		canUserManageOptions: canCurrentUser( state, siteId, 'manage_options' ),
+		canUserPublishPosts: canCurrentUser( state, siteId, 'publish_posts' ),
+		canUserViewStats: canCurrentUser( state, siteId, 'view_stats' ),
+		currentUser,
 		customizeUrl: getCustomizerUrl( state, selectedSiteId ),
+		hasJetpackSites,
 		isDomainOnly: isDomainOnlySite( state, selectedSiteId ),
-		isJetpack: isJetpackSite( state, selectedSiteId ),
+		isJetpack,
+		isPreviewShowing,
+		isSharingEnabledOnJetpackSite,
 		isSiteAutomatedTransfer: !! isSiteAutomatedTransfer( state, selectedSiteId ),
+		siteId,
+		site,
+		siteSuffix: site ? '/' + site.slug : '',
 	};
 }
 

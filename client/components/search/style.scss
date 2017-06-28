@@ -109,6 +109,10 @@
 		-webkit-appearance: none;
 	}
 
+	&:disabled {
+		background: $white;
+	}
+
 	&:focus {
 		box-shadow: none;
 		border: none;
@@ -153,6 +157,14 @@
 				border-radius: inherit;
 			}
 		}
+
+		padding-left: 8px;
+	}
+}
+
+.search.has-open-icon {
+	.search__input-fade {
+		padding-left: 0;
 	}
 }
 

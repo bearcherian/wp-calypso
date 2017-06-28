@@ -23,14 +23,10 @@ import QueryPostCounts from 'components/data/query-post-counts';
 import Button from 'components/button';
 import Site from 'blocks/site';
 import { getCurrentUserId } from 'state/current-user/selectors';
-import sitesList from 'lib/sites-list';
-
-const sites = sitesList();
 
 class MasterbarDrafts extends Component {
 	static propTypes = {
 		user: PropTypes.object,
-		sites: PropTypes.object,
 		isActive: PropTypes.bool,
 		className: PropTypes.string,
 		tooltip: PropTypes.string,
@@ -64,7 +60,12 @@ class MasterbarDrafts extends Component {
 			<div>
 				<QueryPostCounts siteId={ selectedSite.ID } type="post" />
 				{ this.props.draftCount > 0 &&
-					<Button compact borderless className="masterbar__toggle-drafts" onClick={ this.toggleDrafts } ref="drafts" title={ translate( 'Latest Drafts' ) }>
+					<Button
+						compact borderless className="masterbar__toggle-drafts"
+						onClick={ this.toggleDrafts }
+						ref="drafts"
+						title={ translate( 'Latest Drafts' ) }
+					>
 						<Count count={ this.props.draftCount } />
 					</Button>
 				}
@@ -78,11 +79,17 @@ class MasterbarDrafts extends Component {
 					<QueryPosts
 						siteId={ selectedSite.ID }
 						query={ this.props.draftsQuery } />
-					<Site site={ selectedSite } />
+					<Site compact site={ selectedSite } />
 					{ this.props.drafts && this.props.drafts.map( this.renderDraft, this ) }
 					{ isLoading && <Draft isPlaceholder /> }
 					{ this.props.draftCount > 6 &&
-						<Button compact borderless className="masterbar__see-all-drafts" href={ `/posts/drafts/${ selectedSite.slug }` } onClick={ this.closeDrafts }>
+						<Button
+							compact
+							borderless
+							className="masterbar__see-all-drafts"
+							href={ `/posts/drafts/${ selectedSite.slug }` }
+							onClick={ this.closeDrafts }
+						>
 							{ translate( 'See all drafts' ) }
 							{ this.props.draftCount ? <Count count={ this.props.draftCount } /> : null }
 						</Button>
@@ -102,7 +109,7 @@ class MasterbarDrafts extends Component {
 		return <Draft
 			key={ draft.global_ID }
 			post={ draft }
-			sites={ sites }
+			siteId={ site && site.ID }
 			showAuthor={ site && ! site.single_user_site && ! this.props.userId }
 			onTitleClick={ this.closeDrafts }
 		/>;
@@ -118,7 +125,7 @@ export default connect( ( state ) => {
 		status: 'draft',
 		number: 10,
 		order_by: 'modified',
-		author: ( site && ! site.single_user_site ) ? userId : null
+		author: ( site && ! site.jetpack && ! site.single_user_site ) ? userId : null
 	};
 
 	const myPostCounts = getMyPostCounts( state, siteId, 'post' );

@@ -1,7 +1,12 @@
 /**
+ * External dependencies
+ */
+import { get } from 'lodash';
+
+/**
  * Internal dependencies
  */
-import { EDITOR_PASTE_EVENT } from 'state/action-types';
+import { ANALYTICS_EVENT_RECORD, EDITOR_PASTE_EVENT } from 'state/action-types';
 import { SOURCE_GOOGLE_DOCS } from 'components/tinymce/plugins/wpcom-track-paste/sources';
 import config from 'config';
 import { abtest } from 'lib/abtest';
@@ -18,7 +23,7 @@ import {
 	isCurrentPlanPaid,
 } from 'state/sites/selectors';
 
-const WEEK_IN_MILLISECONDS = 7 * 1000 * 3600 * 24;
+export const WEEK_IN_MILLISECONDS = 7 * 1000 * 3600 * 24;
 
 /**
  * Returns a selector that tests if the current user is in a given section
@@ -51,14 +56,24 @@ const timeSinceUserRegistration = state => {
 };
 
 /**
+ * Returns a selector that tests if the user is newer than a given time
+ *
+ * @param {Number} age Number of milliseconds
+ * @return {Function} Selector function
+ */
+export const isUserNewerThan = age => state => {
+	const userAge = timeSinceUserRegistration( state );
+	return userAge !== false ? userAge <= age : false;
+};
+
+/**
  * Returns true if the user is considered "new" (less than a week since registration)
  *
  * @param {Object} state Global state tree
  * @return {Boolean} True if user is new, false otherwise
  */
 export const isNewUser = state => {
-	const userAge = timeSinceUserRegistration( state );
-	return userAge !== false ? userAge <= WEEK_IN_MILLISECONDS : false;
+	return isUserNewerThan( WEEK_IN_MILLISECONDS )( state );
 };
 
 /**
@@ -85,16 +100,26 @@ export const hasUserRegisteredBefore = date => state => {
 	return ( registrationDate < compareDate );
 };
 
+/*
+ * Deprecated.
+ */
+export const hasUserInteractedWithComponent = () => () => false;
+
 /**
- * Returns a selector that tests whether the user has interacted with a given component.
+ * Returns a selector that tests whether a certain analytics event has been
+ * fired.
  *
- * @see client/components/track-interactions
+ * @see client/state/analytics
  *
- * @param {String} componentName Name of component to test
+ * @param {String} eventName Name of analytics event
  * @return {Function} Selector function
  */
-export const hasUserInteractedWithComponent = componentName => state =>
-	getLastAction( state ).component === componentName;
+export const hasAnalyticsEventFired = eventName => state => {
+	const last = getLastAction( state );
+	return ( last.type === ANALYTICS_EVENT_RECORD ) &&
+		last.meta.analytics.some( record =>
+			record.payload.name === eventName );
+};
 
 /**
  * Returns true if the selected site can be previewed
@@ -103,7 +128,7 @@ export const hasUserInteractedWithComponent = componentName => state =>
  * @return {Boolean} True if selected site can be previewed, false otherwise.
  */
 export const isSelectedSitePreviewable = state =>
-	getSelectedSite( state ) && getSelectedSite( state ).is_previewable;
+	get( getSelectedSite( state ), 'is_previewable', false );
 
 /**
  * Returns true if the current user can run customizer for the selected site

@@ -12,7 +12,7 @@ import config from 'config';
 import SectionHeader from 'components/section-header';
 import Card from 'components/card';
 import Button from 'components/button';
-import JetpackModuleToggle from '../jetpack-module-toggle';
+import JetpackModuleToggle from 'my-sites/site-settings/jetpack-module-toggle';
 import FormLegend from 'components/forms/form-legend';
 import FormFieldset from 'components/forms/form-fieldset';
 import FormLabel from 'components/forms/form-label';
@@ -79,7 +79,6 @@ class PublishingTools extends Component {
 					value={ email }
 				/>
 				<Button
-					compact
 					onClick={ this.onRegenerateButtonClick }
 					disabled={ isFormPending || regeneratingPostByEmail || ! postByEmailAddressModuleActive || moduleUnavailable }
 				>
@@ -103,9 +102,9 @@ class PublishingTools extends Component {
 		return (
 			<FormFieldset>
 				<div className="publishing-tools__info-link-container site-settings__info-link-container">
-					<InfoPopover position={ 'left' }>
-						<ExternalLink href={ 'https://jetpack.com/support/post-by-email/' } target="_blank">
-							{ translate( 'Learn more about Post by Email' ) }
+					<InfoPopover position="left">
+						<ExternalLink href="https://jetpack.com/support/post-by-email/" icon target="_blank">
+							{ translate( 'Learn more about Post by Email.' ) }
 						</ExternalLink>
 					</InfoPopover>
 				</div>
@@ -113,7 +112,7 @@ class PublishingTools extends Component {
 				<JetpackModuleToggle
 					siteId={ selectedSiteId }
 					moduleSlug="post-by-email"
-					label={ translate( 'Publish posts by sending an email.' ) }
+					label={ translate( 'Publish posts by sending an email' ) }
 					disabled={ formPending || moduleUnavailable }
 					/>
 

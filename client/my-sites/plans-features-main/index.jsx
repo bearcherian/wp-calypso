@@ -4,6 +4,7 @@
 import React, { Component, PropTypes } from 'react';
 import { localize } from 'i18n-calypso';
 import { filter, get } from 'lodash';
+import classNames from 'classnames';
 
 /**
  * Internal dependencies
@@ -28,8 +29,21 @@ import FAQ from 'components/faq';
 import FAQItem from 'components/faq/faq-item';
 import { isEnabled } from 'config';
 import purchasesPaths from 'me/purchases/paths';
+import { plansLink } from 'lib/plans';
+import SegmentedControl from 'components/segmented-control';
+import SegmentedControlItem from 'components/segmented-control/item';
+import { abtest } from 'lib/abtest';
 
 class PlansFeaturesMain extends Component {
+	isInSignupTest() {
+		const {
+			isInSignup,
+			displayJetpackPlans
+		} = this.props;
+
+		return ( ( isInSignup && ! displayJetpackPlans ) && ( abtest( 'signupPlansCopyChanges' ) === 'modified' ) );
+	}
+
 	getPlanFeatures() {
 		const {
 			site,
@@ -40,12 +54,18 @@ class PlansFeaturesMain extends Component {
 			isLandingPage,
 			basePlansPath,
 			selectedFeature,
-			displayJetpackPlans
+			displayJetpackPlans,
+			domainName
 		} = this.props;
 
 		const isPersonalPlanEnabled = isEnabled( 'plans/personal-plan' );
 		if ( displayJetpackPlans && intervalType === 'monthly' ) {
-			const jetpackPlans = [ PLAN_JETPACK_FREE, PLAN_JETPACK_PERSONAL_MONTHLY, PLAN_JETPACK_PREMIUM_MONTHLY, PLAN_JETPACK_BUSINESS_MONTHLY ];
+			const jetpackPlans = [
+				PLAN_JETPACK_FREE,
+				PLAN_JETPACK_PERSONAL_MONTHLY,
+				PLAN_JETPACK_PREMIUM_MONTHLY,
+				PLAN_JETPACK_BUSINESS_MONTHLY
+			];
 			if ( hideFreePlan ) {
 				jetpackPlans.shift();
 			}
@@ -60,13 +80,21 @@ class PlansFeaturesMain extends Component {
 						basePlansPath={ basePlansPath }
 						intervalType={ intervalType }
 						site={ site }
+						domainName={ domainName }
+						isInSignupTest = { this.isInSignupTest() }
+						displayJetpackPlans = { displayJetpackPlans }
 					/>
 				</div>
 			);
 		}
 
 		if ( displayJetpackPlans ) {
-			const jetpackPlans = [ PLAN_JETPACK_FREE, PLAN_JETPACK_PERSONAL, PLAN_JETPACK_PREMIUM, PLAN_JETPACK_BUSINESS ];
+			const jetpackPlans = [
+				PLAN_JETPACK_FREE,
+				PLAN_JETPACK_PERSONAL,
+				PLAN_JETPACK_PREMIUM,
+				PLAN_JETPACK_BUSINESS
+			];
 			if ( hideFreePlan ) {
 				jetpackPlans.shift();
 			}
@@ -81,6 +109,9 @@ class PlansFeaturesMain extends Component {
 						basePlansPath={ basePlansPath }
 						intervalType={ intervalType }
 						site={ site }
+						domainName={ domainName }
+						isInSignupTest = { this.isInSignupTest() }
+						displayJetpackPlans = { displayJetpackPlans }
 					/>
 				</div>
 			);
@@ -107,6 +138,9 @@ class PlansFeaturesMain extends Component {
 					selectedFeature={ selectedFeature }
 					intervalType={ intervalType }
 					site={ site }
+					domainName={ domainName }
+					isInSignupTest = { this.isInSignupTest() }
+					displayJetpackPlans = { displayJetpackPlans }
 				/>
 			</div>
 		);
@@ -121,8 +155,7 @@ class PlansFeaturesMain extends Component {
 					question={ translate( 'I signed up and paid. What’s next?' ) }
 					answer={ translate(
 						'Our premium features are powered by a few of our other plugins. After purchasing you will' +
-						' need to install the Akismet and VaultPress plugins. If you purchase a Professional' +
-						' subscription, you will also need to install the Polldaddy plugin. Just follow the guide' +
+						' need to install the Akismet and VaultPress plugins. Just follow the guide' +
 						' after you complete your purchase.'
 					) }
 				/>
@@ -156,14 +189,6 @@ class PlansFeaturesMain extends Component {
 				/>
 
 				<FAQItem
-					question={ translate( 'Can I migrate my subscription to a different site?' ) }
-					answer={ translate(
-						'Absolutely. You are always free to activate your premium services on a different' +
-						' WordPress site.'
-					) }
-				/>
-
-				<FAQItem
 					question={ translate( 'What is the cancellation policy?' ) }
 					answer={ translate(
 						'You can request a cancellation within 30 days of purchase and receive a full refund.'
@@ -192,7 +217,7 @@ class PlansFeaturesMain extends Component {
 				<FAQItem
 					question={ translate( 'Do you sell domains?' ) }
 					answer={ translate(
-						'Yes! The personal, premium, and business plans include a free custom domain. That includes new' +
+						'Yes! The Personal, Premium, and Business plans include a free custom domain. That includes new' +
 						' domains purchased through WordPress.com or your own existing domain that you can map' +
 						' to your WordPress.com site. {{a}}Find out more about domains.{{/a}}',
 						{
@@ -208,12 +233,11 @@ class PlansFeaturesMain extends Component {
 				/>
 
 				<FAQItem
-					question={ translate( 'Can I upload my own plugins?' ) }
+					question={ translate( 'Can I install plugins?' ) }
 					answer={ translate(
-						'While uploading your own plugins is not available on WordPress.com, we include the most' +
-						' popular plugin functionality within our sites automatically. The premium and business' +
-						' plans even include their own set of plugins suites tailored just' +
-						' for them. {{a}}Check out all included plugins{{/a}}.',
+						'Yes! With the WordPress.com Business plan you can search for and install external plugins.' +
+						' All plans already come with a custom set of plugins tailored just for them.' +
+						' {{a}}Check out all included plugins{{/a}}.',
 						{
 							components: { a: <a href={ `/plugins/${ site.slug }` } /> }
 						}
@@ -221,14 +245,13 @@ class PlansFeaturesMain extends Component {
 				/>
 
 				<FAQItem
-					question={ translate( 'Can I install my own theme?' ) }
+					question={ translate( 'Can I upload my own theme?' ) }
 					answer={ translate(
-						'We don’t currently allow custom themes to be uploaded to WordPress.com. We do this to keep' +
-						' your site secure but all themes in our {{a}}theme directory{{/a}} have been reviewed' +
-						' by our team and represent the highest quality. The business plan even supports' +
-						' unlimited premium theme access.',
+						'Yes! With the WordPress.com Business plan you can upload any theme you\'d like.' +
+						' All plans give you access to our {{a}}directory of free and premium themes{{/a}}.' +
+						' These are among the highest-quality WordPress themes, hand-picked and reviewed by our team.',
 						{
-							components: { a: <a href={ `/design/${ site.slug }` } /> }
+							components: { a: <a href={ `/themes/${ site.slug }` } /> }
 						}
 					) }
 				/>
@@ -238,15 +261,15 @@ class PlansFeaturesMain extends Component {
 					answer={ translate(
 						'No. All WordPress.com sites include our specially tailored WordPress hosting to ensure' +
 						' your site stays available and secure at all times. You can even use your own domain' +
-						' when you upgrade to the premium or business plan.'
+						' when you upgrade to the Personal, Premium, or Business plan.'
 					) }
 				/>
 
 				<FAQItem
 					question={ translate( 'Do you offer email accounts?' ) }
 					answer={ translate(
-						'Yes. If you register a new domain with our premium or business plans, you can optionally' +
-						' add G Suite. You can also set up email forwarding for any custom domain' +
+						'Yes. If you register a new domain with our Personal, Premium, or Business plans, you can' +
+						' add Google-powered G Suite. You can also set up email forwarding for any custom domain' +
 						' registered through WordPress.com. {{a}}Find out more about email{{/a}}.',
 						{
 							components: {
@@ -283,8 +306,7 @@ class PlansFeaturesMain extends Component {
 					question={ translate( 'Will upgrading affect my content?' ) }
 					answer={ translate(
 						'Plans add extra features to your site, but they do not affect the content of your site' +
-						" or your site's followers. You will never lose content by upgrading or downgrading" +
-						" your site's plan."
+						" or your site's followers."
 					) }
 				/>
 
@@ -313,29 +335,67 @@ class PlansFeaturesMain extends Component {
 		);
 	}
 
+	getIntervalTypeToggle() {
+		const {
+			translate,
+			intervalType,
+			site,
+			basePlansPath,
+		} = this.props;
+		const segmentClasses = classNames(
+			'plan-features__interval-type',
+			'price-toggle'
+		);
+
+		let plansUrl = '/plans';
+		if ( basePlansPath ) {
+			plansUrl = basePlansPath;
+		}
+
+		return (
+			<SegmentedControl compact className={ segmentClasses } primary={ true }>
+				<SegmentedControlItem
+					selected={ intervalType === 'monthly' }
+					path={ plansLink( plansUrl, site, 'monthly' ) }
+				>
+					{ translate( 'Monthly billing' ) }
+				</SegmentedControlItem>
+
+				<SegmentedControlItem
+					selected={ intervalType === 'yearly' }
+					path={ plansLink( plansUrl, site, 'yearly' ) }
+				>
+					{ translate( 'Yearly billing' ) }
+				</SegmentedControlItem>
+			</SegmentedControl>
+		);
+	}
+
 	render() {
 		const {
 			site,
-			showFAQ,
-			displayJetpackPlans
+			displayJetpackPlans,
+			isInSignup,
+			isInSignupTest
 		} = this.props;
 
 		const renderFAQ = () =>
 			displayJetpackPlans
 				? this.getJetpackFAQ()
 				: this.getFAQ( site );
+		let faqs = null;
+
+		if ( ! this.isInSignupTest() || ( displayJetpackPlans && ! isInSignup ) ) {
+			faqs = renderFAQ();
+		}
 
 		return (
 			<div className="plans-features-main">
+				{ ( displayJetpackPlans && isInSignupTest ) ? this.getIntervalTypeToggle() : null }
 				<QueryPlans />
 				<QuerySitePlans siteId={ get( site, 'ID' ) } />
 				{ this.getPlanFeatures() }
-
-				{
-					showFAQ
-						? renderFAQ()
-						: null
-				}
+				{ faqs }
 			</div>
 		);
 	}

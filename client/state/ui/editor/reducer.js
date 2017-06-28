@@ -1,13 +1,10 @@
 /**
- * External dependencies
- */
-import { combineReducers } from 'redux';
-
-/**
  * Internal dependencies
  */
 import { EDITOR_START, POST_SAVE_SUCCESS } from 'state/action-types';
+import { combineReducers } from 'state/utils';
 import imageEditor from './image-editor/reducer';
+import videoEditor from './video-editor/reducer';
 import lastDraft from './last-draft/reducer';
 import contactForm from './contact-form/reducer';
 
@@ -33,6 +30,7 @@ export function postId( state = null, action ) {
 export default combineReducers( {
 	postId,
 	imageEditor,
+	videoEditor,
 	lastDraft,
 	contactForm
 } );

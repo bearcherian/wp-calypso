@@ -21,9 +21,9 @@ function createDomainObjects( dataTransferObject ) {
 
 	domains = dataTransferObject.map( ( domain ) => {
 		return {
-			autoRenewalDate: domain.auto_renewal_date,
+			autoRenewalMoment: domain.auto_renewal_date && i18n.moment( domain.auto_renewal_date ),
 			currentUserCanManage: domain.current_user_can_manage,
-			expirationMoment: domain.expiry ? i18n.moment( domain.expiry ) : null,
+			expirationMoment: domain.expiry && i18n.moment( domain.expiry ),
 			expired: domain.expired,
 			expirySoon: domain.expiry_soon,
 			googleAppsSubscription: assembleGoogleAppsSubscription( domain.google_apps_subscription ),
@@ -35,10 +35,10 @@ function createDomainObjects( dataTransferObject ) {
 			name: domain.domain,
 			owner: domain.owner,
 			privateDomain: domain.private_domain,
+			privacyAvailable: domain.privacy_available,
 			pendingTransfer: domain.pending_transfer,
 			registrar: domain.registrar,
-			registrationDate: domain.registration_date,
-			registrationMoment: domain.registration_date && i18n.moment( domain.registration_date, 'MMMM D, YYYY', 'en' ).locale( false ),
+			registrationMoment: domain.registration_date && i18n.moment( domain.registration_date ),
 			hasZone: domain.has_zone,
 			pointsToWpcom: domain.points_to_wpcom,
 			type: getDomainType( domain )

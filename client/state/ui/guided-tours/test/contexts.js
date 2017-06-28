@@ -2,6 +2,7 @@
  * External dependencies
  */
 import { expect } from 'chai';
+import { moment } from 'i18n-calypso';
 
 /**
  * Internal dependencies
@@ -14,8 +15,14 @@ import {
 	SOURCE_UNKNOWN,
 } from 'components/tinymce/plugins/wpcom-track-paste/sources';
 
+const WEEK_IN_MILLISECONDS = 7 * 1000 * 3600 * 24;
+
 describe( 'selectors', () => {
-	let hasUserRegisteredBefore, hasUserPastedFromGoogleDocs;
+	let isUserNewerThan;
+	let hasUserRegisteredBefore;
+	let hasUserPastedFromGoogleDocs;
+	let hasAnalyticsEventFired;
+	let hasUserClicked;
 
 	useFakeDom();
 
@@ -25,8 +32,43 @@ describe( 'selectors', () => {
 				'state/ui/guided-tours/test/fixtures/config' );
 
 		const contexts = require( '../contexts' );
+		isUserNewerThan = contexts.isUserNewerThan;
 		hasUserRegisteredBefore = contexts.hasUserRegisteredBefore;
 		hasUserPastedFromGoogleDocs = contexts.hasUserPastedFromGoogleDocs;
+		hasAnalyticsEventFired = contexts.hasAnalyticsEventFired;
+		hasUserClicked = hasAnalyticsEventFired( 'calypso_themeshowcase_theme_click' );
+	} );
+
+	describe( '#isUserNewerThan', () => {
+		const oldUser = {
+			currentUser: {
+				id: 73705554
+			},
+			users: {
+				items: {
+					73705554: { ID: 73705554, login: 'testonesite2016', date: moment().subtract( 8, 'days' ) }
+				}
+			},
+		};
+
+		const newUser = {
+			currentUser: {
+				id: 73705554
+			},
+			users: {
+				items: {
+					73705554: { ID: 73705554, login: 'testonesite2016', date: moment() }
+				}
+			},
+		};
+
+		it( 'should return false for users registered before a week ago', () => {
+			expect( isUserNewerThan( WEEK_IN_MILLISECONDS )( oldUser ) ).to.be.false;
+		} );
+
+		it( 'should return true for users registered in the last week', () => {
+			expect( isUserNewerThan( WEEK_IN_MILLISECONDS )( newUser ) ).to.be.true;
+		} );
 	} );
 
 	describe( '#hasUserRegisteredBefore', () => {
@@ -107,6 +149,61 @@ describe( 'selectors', () => {
 				}
 			};
 			expect( hasUserPastedFromGoogleDocs( state ) ).to.be.false;
+		} );
+	} );
+
+	describe( '#hasAnalyticsEventFired', () => {
+		it( 'should return false when no actions', () => {
+			const state = {
+				ui: {
+					actionLog: []
+				}
+			};
+			expect( hasUserClicked( state ) ).to.be.false;
+		} );
+		it( 'should return true when matching action', () => {
+			const state = {
+				ui: {
+					actionLog: [ {
+						type: 'ANALYTICS_EVENT_RECORD',
+						meta: {
+							analytics: [
+								{
+									type: 'ANALYTICS_EVENT_RECORD',
+									payload: {
+										service: 'tracks',
+										name: 'calypso_themeshowcase_theme_click',
+										properties: {}
+									}
+								}
+							]
+						}
+					} ]
+				}
+			};
+			expect( hasUserClicked( state ) ).to.be.true;
+		} );
+		it( 'should return false when mis-matching event', () => {
+			const state = {
+				ui: {
+					actionLog: [ {
+						type: 'ANALYTICS_EVENT_RECORD',
+						meta: {
+							analytics: [
+								{
+									type: 'ANALYTICS_EVENT_RECORD',
+									payload: {
+										service: 'tracks',
+										name: 'wrong_name',
+										properties: {}
+									}
+								}
+							]
+						}
+					} ]
+				}
+			};
+			expect( hasUserClicked( state ) ).to.be.false;
 		} );
 	} );
 } );

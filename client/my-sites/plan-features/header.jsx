@@ -5,7 +5,6 @@ import React, { Component, PropTypes } from 'react';
 import noop from 'lodash/noop';
 import classNames from 'classnames';
 import { connect } from 'react-redux';
-import Gridicon from 'gridicons';
 
 /**
  * Internal Dependencies
@@ -40,16 +39,26 @@ import isSiteAutomatedTransfer from 'state/selectors/is-site-automated-transfer'
 class PlanFeaturesHeader extends Component {
 
 	render() {
+		const { isInSignupTest } = this.props;
+		let content = this.renderPlansHeader();
+
+		if ( isInSignupTest ) {
+			content = this.renderSignupHeader();
+		}
+
+		return content;
+	}
+
+	renderPlansHeader() {
 		const {
-			current,
 			planType,
 			popular,
 			newPlan,
 			title,
 			translate
 		} = this.props;
-		const headerClasses = classNames( 'plan-features__header', getPlanClass( planType ) );
 
+		const headerClasses = classNames( 'plan-features__header', getPlanClass( planType ) );
 		return (
 			<header className={ headerClasses } onClick={ this.props.onClick } >
 				{
@@ -58,9 +67,11 @@ class PlanFeaturesHeader extends Component {
 				{
 					newPlan && <Ribbon>{ translate( 'New' ) }</Ribbon>
 				}
+				{
+					this.isPlanCurrent() && <Ribbon>{ translate( 'Your Plan' ) }</Ribbon>
+				}
 				<div className="plan-features__header-figure" >
 					<PlanIcon plan={ planType } />
-					{ current && <Gridicon icon="checkmark-circle" className="plan-features__header-checkmark" /> }
 				</div>
 				<div className="plan-features__header-text">
 					<h4 className="plan-features__header-title">{ title }</h4>
@@ -71,16 +82,52 @@ class PlanFeaturesHeader extends Component {
 		);
 	}
 
+	renderSignupHeader() {
+		const {
+			planType,
+			popular,
+			newPlan,
+			title,
+			audience,
+			translate
+		} = this.props;
+
+		const headerClasses = classNames( 'plan-features__header', getPlanClass( planType ) );
+		return (
+			<div className="plan-features__header-wrapper">
+				<header className={ headerClasses } onClick={ this.props.onClick } >
+					{
+						popular && <Ribbon>{ translate( 'Popular' ) }</Ribbon>
+					}
+					{
+						newPlan && <Ribbon>{ translate( 'New' ) }</Ribbon>
+					}
+
+					<div className="plan-features__header-text">
+						<h4 className="plan-features__header-title">{ title }</h4>
+						{ audience }
+					</div>
+				</header>
+				<div className="plan-features__graphic">
+					<PlanIcon plan={ planType } />
+				</div>
+				<div className="plan-features__pricing">
+					{ this.getPlanFeaturesPrices() } { this.getBillingTimeframe() }
+				</div>
+			</div>
+		);
+	}
+
 	getBillingTimeframe() {
 		const {
-			hideMonthly,
 			billingTimeFrame,
 			discountPrice,
 			isPlaceholder,
 			site,
 			translate,
 			isSiteAT,
-			currentSitePlan
+			hideMonthly,
+			isInSignupTest
 		} = this.props;
 
 		const isDiscounted = !! discountPrice;
@@ -89,11 +136,19 @@ class PlanFeaturesHeader extends Component {
 			'is-placeholder': isPlaceholder
 		} );
 
+		if ( isInSignupTest ) {
+			return (
+				<span>
+					<span>{ billingTimeFrame }</span>
+				</span>
+			);
+		}
+
 		if (
 			isSiteAT ||
 			! site.jetpack ||
 			this.props.planType === PLAN_JETPACK_FREE ||
-			( hideMonthly && ( ! currentSitePlan || currentSitePlan.productSlug === PLAN_JETPACK_FREE ) )
+			hideMonthly
 		) {
 			return (
 				<p className={ timeframeClasses }>
@@ -101,7 +156,7 @@ class PlanFeaturesHeader extends Component {
 					{ isDiscounted && ! isPlaceholder &&
 						<InfoPopover
 							className="plan-features__header-tip-info"
-							position={ isMobile() ? 'top' : 'left bottom' }>
+							position={ isMobile() ? 'top' : 'bottom left' }>
 							{ translate( 'Discount for first year' ) }
 						</InfoPopover>
 					}
@@ -118,10 +173,13 @@ class PlanFeaturesHeader extends Component {
 			rawPrice,
 			intervalType,
 			site,
-			basePlansPath
+			basePlansPath,
+			hideMonthly
 		} = this.props;
 
-		if ( ! rawPrice || this.isPlanCurrent() ) {
+		if ( hideMonthly ||
+			! rawPrice ||
+			this.isPlanCurrent() ) {
 			return (
 				<div className="plan-features__interval-type is-placeholder">
 				</div>
@@ -168,16 +226,16 @@ class PlanFeaturesHeader extends Component {
 
 	getPlanFeaturesPrices() {
 		const {
-			hideMonthly,
 			currencyCode,
 			discountPrice,
 			rawPrice,
 			isPlaceholder,
 			relatedMonthlyPlan,
-			site
+			site,
+			isInSignupTest
 		} = this.props;
 
-		if ( isPlaceholder ) {
+		if ( isPlaceholder && ! isInSignupTest ) {
 			const isJetpackSite = !! site.jetpack;
 			const classes = classNames( 'is-placeholder', {
 				'plan-features__price': ! isJetpackSite,
@@ -188,27 +246,52 @@ class PlanFeaturesHeader extends Component {
 				<div className={ classes } ></div>
 			);
 		}
+
 		if ( discountPrice ) {
 			return (
 				<span className="plan-features__header-price-group">
-					<PlanPrice currencyCode={ currencyCode } rawPrice={ rawPrice } original />
-					<PlanPrice currencyCode={ currencyCode } rawPrice={ discountPrice } discounted />
+					<PlanPrice
+						currencyCode={ currencyCode }
+						rawPrice={ rawPrice }
+						isInSignupTest={ isInSignupTest }
+						original
+					/>
+					<PlanPrice
+						currencyCode={ currencyCode }
+						rawPrice={ discountPrice }
+						isInSignupTest={ isInSignupTest }
+						discounted
+					/>
 				</span>
 			);
 		}
 
-		if ( relatedMonthlyPlan && ! hideMonthly ) {
+		if ( relatedMonthlyPlan ) {
 			const originalPrice = relatedMonthlyPlan.raw_price * 12;
 			return (
 				<span className="plan-features__header-price-group">
-					<PlanPrice currencyCode={ currencyCode } rawPrice={ originalPrice } original />
-					<PlanPrice currencyCode={ currencyCode } rawPrice={ rawPrice } discounted />
+					<PlanPrice
+						currencyCode={ currencyCode }
+						rawPrice={ originalPrice }
+						isInSignupTest={ isInSignupTest }
+						original
+					/>
+					<PlanPrice
+						currencyCode={ currencyCode }
+						rawPrice={ rawPrice }
+						isInSignupTest={ isInSignupTest }
+						discounted
+					/>
 				</span>
 			);
 		}
 
 		return (
-			<PlanPrice currencyCode={ currencyCode } rawPrice={ rawPrice } />
+			<PlanPrice
+				currencyCode={ currencyCode }
+				rawPrice={ rawPrice }
+				isInSignupTest={ isInSignupTest }
+			/>
 		);
 	}
 }

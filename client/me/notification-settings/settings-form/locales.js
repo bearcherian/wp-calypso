@@ -13,13 +13,14 @@ export const settingLabels = {
 	post_like: () => i18n.translate( 'Likes on my posts' ),
 	follow: () => i18n.translate( 'Site follows' ),
 	achievement: () => i18n.translate( 'Site achievements' ),
-	mentions: () => i18n.translate( 'Username mentions' )
+	mentions: () => i18n.translate( 'Username mentions' ),
+	scheduled_publicize: () => i18n.translate( 'Post Publicized' ),
 };
 
 export const getLabelForStream = stream => stream in streamLabels
-	? streamLabels[stream].call()
+	? streamLabels[ stream ].call()
 	: null;
 
 export const getLabelForSetting = setting => setting in settingLabels
-	? settingLabels[setting].call()
+	? settingLabels[ setting ].call()
 	: null;

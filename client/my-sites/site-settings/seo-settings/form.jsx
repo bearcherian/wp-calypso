@@ -7,11 +7,14 @@ import { Set } from 'immutable';
 import {
 	get,
 	includes,
+	isArray,
 	isEqual,
 	isString,
+	mapValues,
 	omit,
 	overSome,
-	pickBy
+	pickBy,
+	partial
 } from 'lodash';
 import { localize } from 'i18n-calypso';
 
@@ -34,28 +37,43 @@ import FormLabel from 'components/forms/form-label';
 import FormSettingExplanation from 'components/forms/form-setting-explanation';
 import CountedTextarea from 'components/forms/counted-textarea';
 import Banner from 'components/banner';
-import SeoSettingsHelpCard from './help';
 import PageViewTracker from 'lib/analytics/page-view-tracker';
 import {
-	getSiteOption,
 	getSeoTitleFormatsForSite,
 	isJetpackMinimumVersion,
 	isJetpackSite,
+	isRequestingSite,
 } from 'state/sites/selectors';
+import {
+	isSiteSettingsSaveSuccessful,
+	getSiteSettingsSaveError,
+} from 'state/site-settings/selectors';
 import { getSelectedSite, getSelectedSiteId } from 'state/ui/selectors';
-import { isJetpackModuleActive } from 'state/selectors';
+import {
+	isJetpackModuleActive,
+	isHiddenSite,
+	isPrivateSite,
+} from 'state/selectors';
 import { toApi as seoTitleToApi } from 'components/seo/meta-title-editor/mappings';
 import { recordTracksEvent } from 'state/analytics/actions';
 import WebPreview from 'components/web-preview';
 import { requestSite } from 'state/sites/actions';
+import { activateModule } from 'state/jetpack/modules/actions';
 import {
 	isBusiness,
 	isEnterprise,
 	isJetpackBusiness
 } from 'lib/products-values';
-import { hasFeature } from 'lib/plans';
+import { hasFeature } from 'state/sites/plans/selectors';
+import { getPlugins } from 'state/plugins/installed/selectors';
 import { FEATURE_ADVANCED_SEO, PLAN_BUSINESS } from 'lib/plans/constants';
 import QueryJetpackModules from 'components/data/query-jetpack-modules';
+import QueryJetpackPlugins from 'components/data/query-jetpack-plugins';
+import QuerySiteSettings from 'components/data/query-site-settings';
+import {
+	requestSiteSettings,
+	saveSiteSettings
+} from 'state/site-settings/actions';
 
 const serviceIds = {
 	google: 'google-site-verification',
@@ -124,7 +142,6 @@ export const SeoForm = React.createClass( {
 			// are in progress and haven't yet been saved
 			// to the server
 			dirtyFields: Set(),
-			isRefreshingSiteData: true,
 			invalidatedSiteObject: this.props.selectedSite,
 		};
 	},
@@ -141,9 +158,23 @@ export const SeoForm = React.createClass( {
 	},
 
 	componentWillReceiveProps( nextProps ) {
-		const { selectedSite: prevSite } = this.props;
+		const { selectedSite: prevSite, isFetchingSite, translate } = this.props;
 		const { selectedSite: nextSite } = nextProps;
 		const { dirtyFields } = this.state;
+
+		// save success
+		if ( this.state.isSubmittingForm && nextProps.isSaveSuccess ) {
+			this.props.markSaved();
+			this.props.requestSiteSettings( nextProps.siteId );
+			this.refreshCustomTitles();
+			this.setState( { isSubmittingForm: false } );
+		}
+
+		// save error
+		if ( this.state.isSubmittingForm && nextProps.saveError ) {
+			this.setState( { isSubmittingForm: false } );
+			notices.error( translate( 'There was a problem saving your changes. Please, try again.' ) );
+		}
 
 		// if we are changing sites, everything goes
 		if ( prevSite.ID !== nextSite.ID ) {
@@ -151,7 +182,6 @@ export const SeoForm = React.createClass( {
 				...stateForSite( nextSite ),
 				seoTitleFormats: nextProps.storedTitleFormats,
 				invalidatedSiteObject: nextSite,
-				isRefreshingSiteData: true,
 				dirtyFields: Set(),
 			}, this.refreshCustomTitles );
 		}
@@ -161,12 +191,7 @@ export const SeoForm = React.createClass( {
 			seoTitleFormats: nextProps.storedTitleFormats,
 		};
 
-		const isRefreshingSiteData = (
-			this.state.isRefreshingSiteData &&
-			( this.state.invalidatedSiteObject === nextProps.selectedSite )
-		);
-
-		if ( this.state.isRefreshingSiteData && ! isRefreshingSiteData ) {
+		if ( ! isFetchingSite ) {
 			nextState = {
 				...nextState,
 				seoTitleFormats: nextProps.storedTitleFormats,
@@ -174,7 +199,7 @@ export const SeoForm = React.createClass( {
 			};
 		}
 
-		if ( isRefreshingSiteData ) {
+		if ( dirtyFields.has( 'seoTitleFormats' ) ) {
 			nextState = omit( nextState, [ 'seoTitleFormats' ] );
 		}
 
@@ -182,8 +207,7 @@ export const SeoForm = React.createClass( {
 		nextState = omit( nextState, dirtyFields.toArray() );
 
 		this.setState( {
-			...nextState,
-			isRefreshingSiteData,
+			...nextState
 		} );
 	},
 
@@ -237,14 +261,12 @@ export const SeoForm = React.createClass( {
 
 	submitSeoForm( event ) {
 		const {
-			site,
+			siteId,
 			storedTitleFormats,
 			showAdvancedSeo,
 			showWebsiteMeta,
 			translate,
 		} = this.props;
-
-		const { dirtyFields } = this.state;
 
 		if ( ! event.isDefaultPrevented() && event.nativeEvent ) {
 			event.preventDefault();
@@ -274,8 +296,7 @@ export const SeoForm = React.createClass( {
 		}
 
 		this.setState( {
-			isSubmittingForm: true,
-			isRefreshingSiteData: dirtyFields.has( 'seoTitleFormats' ),
+			isSubmittingForm: true
 		} );
 
 		// We need to be careful here and only
@@ -301,25 +322,15 @@ export const SeoForm = React.createClass( {
 			updatedOptions.advanced_seo_front_page_description = this.state.frontPageMetaDescription;
 		}
 
-		site.saveSettings( updatedOptions, error => {
-			if ( error ) {
-				switch ( error.error ) {
-					case 'invalid_ip':
-						notices.error( translate( 'One of your IP Addresses was invalid. Please, try again.' ) );
-						break;
-					default:
-						notices.error( translate( 'There was a problem saving your changes. Please, try again.' ) );
-				}
-				this.setState( { isSubmittingForm: false } );
-			} else {
-				notices.success( translate( 'Settings saved!' ) );
-				this.props.markSaved();
-				this.setState( { isSubmittingForm: false } );
+		// Since the absence of data indicates that there are no changes in the network request
+		// we need to send an indicator that we specifically want to clear the format
+		// We will pass an empty string in this case.
+		updatedOptions.advanced_seo_title_formats = mapValues(
+			updatedOptions.advanced_seo_title_formats,
+			format => isArray( format ) && 0 === format.length ? '' : format,
+		);
 
-				site.fetchSettings();
-				this.refreshCustomTitles();
-			}
-		} );
+		this.props.saveSiteSettings( siteId, updatedOptions );
 
 		this.trackSubmission();
 	},
@@ -351,7 +362,6 @@ export const SeoForm = React.createClass( {
 
 		if ( selectedSite && selectedSite.ID ) {
 			this.setState( {
-				isRefreshingSiteData: true,
 				invalidatedSiteObject: selectedSite,
 			}, () => refreshSiteData( selectedSite.ID ) );
 		}
@@ -376,23 +386,36 @@ export const SeoForm = React.createClass( {
 		this.setState( { showPreview: false } );
 	},
 
+	getConflictingSeoPlugins( activePlugins ) {
+		const conflictingSeoPlugins = [
+			'Yoast SEO',
+			'Yoast SEO Premium',
+			'All In One SEO Pack',
+			'All in One SEO Pack Pro',
+		];
+
+		return activePlugins
+			.filter( ( { name } ) => includes( conflictingSeoPlugins, name ) )
+			.map( ( { name, slug } ) => ( { name, slug } ) );
+	},
+
 	render() {
 		const {
 			siteId,
 			siteIsJetpack,
-			jetpackManagementUrl,
 			jetpackVersionSupportsSeo,
 			showAdvancedSeo,
 			showWebsiteMeta,
 			site,
+			isFetchingSite,
 			isSeoToolsActive,
+			isSitePrivate,
+			isSiteHidden,
 			isVerificationToolsActive,
+			activePlugins,
 			translate,
 		} = this.props;
 		const {
-			settings: {
-				blog_public = 1
-			} = {},
 			slug = '',
 			URL: siteUrl = '',
 		} = site;
@@ -400,7 +423,6 @@ export const SeoForm = React.createClass( {
 		const {
 			isSubmittingForm,
 			isFetchingSettings,
-			isRefreshingSiteData,
 			frontPageMetaDescription,
 			showPasteError = false,
 			hasHtmlTagError = false,
@@ -410,14 +432,14 @@ export const SeoForm = React.createClass( {
 
 		let { googleCode, bingCode, pinterestCode, yandexCode } = this.state;
 
-		const isSitePrivate = parseInt( blog_public, 10 ) !== 1;
+		const activateSeoTools = () => this.props.activateModule( siteId, 'seo-tools' );
+		const activateVerificationServices = () => this.props.activateModule( siteId, 'verification-tools' );
 		const isJetpackUnsupported = siteIsJetpack && ! jetpackVersionSupportsSeo;
-		const isDisabled = isSitePrivate || isJetpackUnsupported || isSubmittingForm || isFetchingSettings;
+		const isDisabled = isJetpackUnsupported || isSubmittingForm || isFetchingSettings;
 		const isSeoDisabled = isDisabled || isSeoToolsActive === false;
 		const isVerificationDisabled = isDisabled || isVerificationToolsActive === false;
 		const isSaveDisabled = isDisabled || isSubmittingForm || ( ! showPasteError && invalidCodes.length > 0 );
 
-		const sitemapUrl = `${ siteUrl }/sitemap.xml`;
 		const generalTabUrl = getGeneralTabUrl( slug );
 		const jetpackUpdateUrl = getJetpackPluginUrl( slug );
 		const placeholderTagContent = '1234';
@@ -451,9 +473,16 @@ export const SeoForm = React.createClass( {
 			</Button>
 		);
 
+		const conflictedSeoPlugin = siteIsJetpack
+			// Let's just pick the first one to keep the notice short.
+			? this.getConflictingSeoPlugins( activePlugins )[ 0 ]
+			: null;
+
 		/* eslint-disable react/jsx-no-target-blank */
 		return (
 			<div>
+				<QuerySiteSettings siteId={ siteId } />
+				{ siteId && <QueryJetpackPlugins siteIds={ [ siteId ] } /> }
 				{
 					siteIsJetpack &&
 					<QueryJetpackModules siteId={ siteId } />
@@ -462,17 +491,32 @@ export const SeoForm = React.createClass( {
 					path="/settings/seo/:site"
 					title="Site Settings > SEO"
 				/>
-				{ isSitePrivate && hasBusinessPlan( site.plan ) &&
+				{ ( isSitePrivate || isSiteHidden ) && hasBusinessPlan( site.plan ) &&
+					<Notice
+						status="is-warning"
+						showDismiss={ false }
+						text={ isSitePrivate
+							? translate( "SEO settings aren't recognized by search engines while your site is Private." )
+							: translate( "SEO settings aren't recognized by search engines while your site is Hidden." )
+						}
+					>
+						<NoticeAction href={ generalTabUrl }>
+							{ translate( 'Privacy Settings' ) }
+						</NoticeAction>
+					</Notice>
+				}
+
+				{ conflictedSeoPlugin &&
 					<Notice
 						status="is-warning"
 						showDismiss={ false }
 						text={ translate(
-							'SEO settings are disabled because the ' +
-							'site visibility is not set to Public.'
+							'Your SEO settings are managed by the following plugin: %(pluginName)s',
+							{ args: { pluginName: conflictedSeoPlugin.name } }
 						) }
 					>
-						<NoticeAction href={ generalTabUrl }>
-							{ translate( 'View Settings' ) }
+						<NoticeAction href={ `/plugins/${ conflictedSeoPlugin.slug }/${ slug }` }>
+							{ translate( 'View Plugin' ) }
 						</NoticeAction>
 					</Notice>
 				}
@@ -499,13 +543,13 @@ export const SeoForm = React.createClass( {
 							'SEO Tools module is disabled in Jetpack.'
 						) }
 					>
-						<NoticeAction href={ jetpackManagementUrl + 'admin.php?page=jetpack#/engagement' }>
+						<NoticeAction onClick={ activateSeoTools }>
 							{ translate( 'Enable' ) }
 						</NoticeAction>
 					</Notice>
 				}
 
-				{ ! hasFeature( FEATURE_ADVANCED_SEO, site.ID ) &&
+				{ ! this.props.hasAdvancedSEOFeature &&
 					<Banner
 						description={ translate( 'Adds tools to optimize your site for search engines and social media sharing.' ) }
 						event={ 'calypso_seo_settings_upgrade_nudge' }
@@ -515,10 +559,8 @@ export const SeoForm = React.createClass( {
 					/>
 				}
 
-				<SeoSettingsHelpCard />
-
 				<form onChange={ this.props.markChanged } className="seo-settings__seo-form">
-					{ showAdvancedSeo &&
+					{ showAdvancedSeo && ! conflictedSeoPlugin &&
 						<div>
 							<SectionHeader label={ translate( 'Page Title Structure' ) }>
 								{ seoSubmitButton }
@@ -535,7 +577,7 @@ export const SeoForm = React.createClass( {
 							</Card>
 							<Card>
 								<MetaTitleEditor
-									disabled={ isRefreshingSiteData || isSeoDisabled }
+									disabled={ isFetchingSite || isSeoDisabled }
 									onChange={ this.updateTitleFormats }
 									titleFormats={ this.state.seoTitleFormats }
 								/>
@@ -543,7 +585,7 @@ export const SeoForm = React.createClass( {
 						</div>
 					}
 
-					{ ( showAdvancedSeo || ( ! siteIsJetpack && showWebsiteMeta ) ) &&
+					{ ! conflictedSeoPlugin && ( showAdvancedSeo || ( ! siteIsJetpack && showWebsiteMeta ) ) &&
 						<div>
 							<SectionHeader label={ translate( 'Website Meta' ) }>
 								{ seoSubmitButton }
@@ -599,7 +641,7 @@ export const SeoForm = React.createClass( {
 								'Site Verification Services are disabled in Jetpack.'
 							) }
 						>
-							<NoticeAction href={ jetpackManagementUrl + 'admin.php?page=jetpack#/engagement' }>
+							<NoticeAction onClick={ activateVerificationServices }>
 								{ translate( 'Enable' ) }
 							</NoticeAction>
 						</Notice>
@@ -720,20 +762,6 @@ export const SeoForm = React.createClass( {
 								onChange={ this.changeYandexCode } />
 							{ hasError( 'yandex' ) && this.getVerificationError( showPasteError ) }
 						</FormFieldset>
-						<FormFieldset>
-							<FormLabel htmlFor="seo_sitemap">{ translate( 'XML Sitemap' ) }</FormLabel>
-							<ExternalLink
-								className="seo-settings__seo-sitemap"
-								icon={ true }
-								href={ sitemapUrl }
-								target="_blank"
-							>
-								{ sitemapUrl }
-							</ExternalLink>
-							<FormSettingExplanation>
-								{ translate( 'Your site\'s sitemap is automatically sent to all major search engines for indexing.' ) }
-							</FormSettingExplanation>
-						</FormFieldset>
 					</Card>
 				</form>
 				<WebPreview
@@ -756,7 +784,6 @@ const mapStateToProps = ( state, ownProps ) => {
 	const isAdvancedSeoEligible = site && site.plan && hasBusinessPlan( site.plan );
 	const siteId = getSelectedSiteId( state );
 	const siteIsJetpack = isJetpackSite( state, siteId );
-	const jetpackManagementUrl = getSiteOption( state, siteId, 'admin_url' );
 	const jetpackVersionSupportsSeo = isJetpackMinimumVersion( state, siteId, '4.4-beta1' );
 	const isAdvancedSeoSupported = site && ( ! siteIsJetpack || ( siteIsJetpack && jetpackVersionSupportsSeo ) );
 
@@ -767,19 +794,28 @@ const mapStateToProps = ( state, ownProps ) => {
 		storedTitleFormats: getSeoTitleFormatsForSite( getSelectedSite( state ) ),
 		showAdvancedSeo: isAdvancedSeoEligible && isAdvancedSeoSupported,
 		showWebsiteMeta: !! get( site, 'options.advanced_seo_front_page_description', '' ),
-		jetpackManagementUrl,
 		jetpackVersionSupportsSeo: jetpackVersionSupportsSeo,
+		isFetchingSite: isRequestingSite( state, siteId ),
 		isSeoToolsActive: isJetpackModuleActive( state, siteId, 'seo-tools' ),
+		isSiteHidden: isHiddenSite( state, siteId ),
+		isSitePrivate: isPrivateSite( state, siteId ),
 		isVerificationToolsActive: isJetpackModuleActive( state, siteId, 'verification-tools' ),
+		activePlugins: getPlugins( state, [ { ID: siteId } ], 'active' ),
+		hasAdvancedSEOFeature: hasFeature( state, siteId, FEATURE_ADVANCED_SEO ),
+		isSaveSuccess: isSiteSettingsSaveSuccessful( state, siteId ),
+		saveError: getSiteSettingsSaveError( state, siteId ),
 	};
 };
 
-const mapDispatchToProps = dispatch => ( {
-	refreshSiteData: siteId => dispatch( requestSite( siteId ) ),
-	trackFormSubmitted: () => dispatch( recordTracksEvent( 'calypso_seo_settings_form_submit', {} ) ),
-	trackTitleFormatsUpdated: () => dispatch( recordTracksEvent( 'calypso_seo_tools_title_formats_updated', {} ) ),
-	trackFrontPageMetaUpdated: () => dispatch( recordTracksEvent( 'calypso_seo_tools_front_page_meta_updated', {} ) )
-} );
+const mapDispatchToProps = {
+	refreshSiteData: requestSite,
+	requestSiteSettings,
+	saveSiteSettings,
+	trackFormSubmitted: partial( recordTracksEvent, 'calypso_seo_settings_form_submit' ),
+	trackTitleFormatsUpdated: partial( recordTracksEvent, 'calypso_seo_tools_title_formats_updated' ),
+	trackFrontPageMetaUpdated: partial( recordTracksEvent, 'calypso_seo_tools_front_page_meta_updated' ),
+	activateModule,
+};
 
 export default connect(
 	mapStateToProps,

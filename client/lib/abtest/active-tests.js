@@ -8,75 +8,87 @@ module.exports = {
 		},
 		defaultVariation: 'singlePurchaseFlow'
 	},
-	signupStore: {
-		datestamp: '20160927',
+	signupSurveyStep: {
+		datestamp: '20170329',
 		variations: {
-			designTypeWithoutStore: 0,
-			designTypeWithStore: 100,
+			showSurveyStep: 20,
+			hideSurveyStep: 80,
 		},
-		defaultVariation: 'designTypeWithStore',
-		allowExistingUsers: false,
+		defaultVariation: 'hideSurveyStep',
 	},
-	signupStoreBenchmarking: {
-		datestamp: '20160927',
-		variations: {
-			pressable: 97,
-			bluehost: 1,
-			bluehostWithWoo: 1,
-			siteground: 1
-		},
-		defaultVariation: 'pressable',
-		allowExistingUsers: false,
-	},
-	signupThemeUpload: {
-		datestamp: '20160928',
-		variations: {
-			showThemeUpload: 10,
-			hideThemeUpload: 90,
-		},
-		defaultVariation: 'hideThemeUpload',
-		allowExistingUsers: false,
-	},
-	userFirstSignup: {
-		datestamp: '20160124',
-		variations: {
-			userLast: 100,
-			userFirst: 0,
-		},
-		defaultVariation: 'userLast',
-		allowExistingUsers: false,
-	},
-	premiumSquaredPlansWording: {
-		datestamp: '20170111',
-		variations: {
-			withoutMarketingCopy: 50,
-			withMarketingCopy: 50
-		},
-		defaultVariation: 'withoutMarketingCopy',
-		allowExistingUsers: true
-	},
-	jetpackPlansNoMonthly: {
-		datestamp: '20170302',
-		variations: {
-			showMonthly: 50,
-			hideMonthly: 50
-		},
-		defaultVariation: 'showMonthly',
-		allowExistingUsers: true
-	},
-	signupDomainsHeadline: {
-		datestamp: '20170313',
+	businessPlanDescriptionAT: {
+		datestamp: '20170605',
 		variations: {
 			original: 50,
-			updated: 50
+			pluginsAndThemes: 50,
 		},
-		defaultVariation: 'original'
+		defaultVariation: 'original',
 	},
-	signupStepOneCopyChanges: {
-		datestamp: '20170307',
+	presaleChatButton: {
+		datestamp: '20170328',
+		variations: {
+			showChatButton: 20,
+			original: 80
+		},
+		defaultVariation: 'original',
+		localeTargets: 'any',
+	},
+	newSiteWithJetpack: {
+		datestamp: '20170419',
+		variations: {
+			showNewJetpackSite: 50,
+			onlyDotComSites: 50,
+		},
+		defaultVariation: 'onlyDotComSites',
+	},
+	chatOfferOnCancel: {
+		datestamp: '20170421',
+		variations: {
+			show: 50,
+			hide: 50,
+		},
+		defaultVariation: 'show',
+		allowExistingUsers: true,
+	},
+	ATPromptOnCancel: {
+		datestamp: '20170515',
+		variations: {
+			hide: 20,
+			show: 80,
+		},
+		defaultVariation: 'hide',
+		allowExistingUsers: true,
+	},
+	ATUpgradeOnCancel: {
+		datestamp: '20170515',
+		variations: {
+			hide: 20,
+			show: 80,
+		},
+		defaultVariation: 'hide',
+		allowExistingUsers: true,
+	},
+	savingsInCheckoutSummary: {
+		datestamp: '20170516',
+		variations: {
+			hide: 50,
+			show: 50,
+		},
+		defaultVariation: 'show',
+	},
+	signupPlansCopyChanges: {
+		datestamp: '20170623',
 		variations: {
 			original: 50,
 			modified: 50,
+		},
+		defaultVariation: 'original',
+	},
+	signupProgressIndicator: {
+		datestamp: '20170612',
+		variations: {
+			original: 50,
+			wizardbar: 50,
 		},
 		defaultVariation: 'original',
 	},

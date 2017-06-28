@@ -75,7 +75,7 @@ function markDirty( post, oldStatus ) {
 			continue;
 		}
 
-		if ( -1 === affectedSites.indexOf( list.query.siteID ) ) {
+		if ( -1 === affectedSites.indexOf( list.query.siteId ) ) {
 			continue;
 		}
 
@@ -158,7 +158,7 @@ export function getCanonicalList( listKey, requestKey ) {
 		return false;
 	}
 	const keys = Object.keys( stream );
-	if ( keys[0] !== requestKey ) {
+	if ( keys[ 0 ] !== requestKey ) {
 		// requests processing out of order, clear cache
 		delete cache[ listKey ];
 		delete _canonicalCache[ listKey ];

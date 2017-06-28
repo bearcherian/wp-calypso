@@ -1,17 +1,17 @@
 /**
  * External dependencies
  */
-const React = require( 'react' );
+import React from 'react';
+import classnames from 'classnames';
 
 /**
  * Internal dependencies
  */
-const Card = require( 'components/card' ),
-	Search = require( 'components/search' );
+import Card from 'components/card';
+import Search from 'components/search';
 
-const SearchCard = React.createClass( {
-
-	propTypes: {
+class SearchCard extends React.Component {
+	static propTypes = {
 		additionalClasses: React.PropTypes.string,
 		initialValue: React.PropTypes.string,
 		placeholder: React.PropTypes.string,
@@ -22,24 +22,28 @@ const SearchCard = React.createClass( {
 		autoFocus: React.PropTypes.bool,
 		disabled: React.PropTypes.bool,
 		dir: React.PropTypes.string,
-		maxLength: React.PropTypes.number
-	},
+		maxLength: React.PropTypes.number,
+		hideOpenIcon: React.PropTypes.bool,
+		disableAutocorrect: React.PropTypes.bool,
+	};
 
-	render: function() {
+	render() {
+		const cardClasses = classnames( 'search-card', this.props.className );
+
 		return (
-			<Card className="search-card">
+			<Card className={ cardClasses }>
 				<Search ref="search" { ...this.props } />
 			</Card>
 		);
-	},
-
-	focus: function() {
-		this.refs.search.focus();
-	},
-
-	clear: function() {
-		this.refs.search.clear();
 	}
-} );
 
-module.exports = SearchCard;
+	focus = () => {
+		this.refs.search.focus();
+	};
+
+	clear = () => {
+		this.refs.search.clear();
+	};
+}
+
+export default SearchCard;

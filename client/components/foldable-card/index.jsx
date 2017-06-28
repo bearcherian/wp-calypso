@@ -42,9 +42,15 @@ var FoldableCard = React.createClass( {
 			onClose: noop,
 			cardKey: '',
 			icon: 'chevron-down',
-			isExpanded: false,
+			expanded: false,
 			screenReaderText: false,
 		};
+	},
+
+	componentWillReceiveProps: function( nextProps ) {
+		if ( nextProps.expanded !== this.props.expanded ) {
+			this.setState( { expanded: nextProps.expanded } );
+		}
 	},
 
 	onClick: function() {
@@ -92,6 +98,7 @@ var FoldableCard = React.createClass( {
 			return (
 				<button
 					disabled={ this.props.disabled }
+					type="button"
 					className="foldable-card__action foldable-card__expand"
 					onClick={ clickAction }>
 					<span className="screen-reader-text">{ screenReaderText }</span>

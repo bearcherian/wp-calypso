@@ -2,6 +2,7 @@
  * External dependencies
  */
 import React from 'react';
+import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
@@ -22,19 +23,19 @@ const RegisteredDomain = React.createClass( {
 	mixins: [ analyticsMixin( 'domainManagement', 'edit' ) ],
 
 	getAutoRenewalOrExpirationDate() {
-		const domain = this.props.domain;
+		const { domain, translate } = this.props;
 
 		if ( domain.isAutoRenewing ) {
 			return (
-				<Property label={ this.translate( 'Renews on' ) }>
-					{ domain.autoRenewalDate }
+				<Property label={ translate( 'Renews on' ) }>
+					{ domain.autoRenewalMoment.format( 'LL' ) }
 				</Property>
 			);
 		}
 
 		return (
-			<Property label={ this.translate( 'Expires on' ) }>
-				{ domain.expirationMoment.format( 'MMMM D, YYYY' ) }
+			<Property label={ translate( 'Expires on' ) }>
+				{ domain.expirationMoment.format( 'LL' ) }
 			</Property>
 		);
 	},
@@ -52,51 +53,61 @@ const RegisteredDomain = React.createClass( {
 	},
 
 	getPrivacyProtection() {
-		const { hasPrivacyProtection, privateDomain, name, pendingTransfer } = this.props.domain,
+		const { hasPrivacyProtection, privateDomain, privacyAvailable, name, pendingTransfer } = this.props.domain,
 			{ slug } = this.props.selectedSite,
+			{ translate } = this.props,
 			privacyPath = paths.domainManagementContactsPrivacy( slug, name ),
 			transferPath = paths.domainManagementTransferOut( slug, name );
+		let label;
+
+		if ( ! privacyAvailable ) {
+			return false;
+		}
 
 		if ( pendingTransfer ) {
-			return this.getLabel( {
+			label = this.getLabel( {
 				status: 'is-warning',
 				icon: 'notice',
-				message: this.translate( 'Pending Transfer', {
+				message: translate( 'Pending Transfer', {
 					context: 'An icon label when domain is pending transfer.'
 				} )
 			} );
-		}
-
-		if ( hasPrivacyProtection ) {
+		} else if ( hasPrivacyProtection ) {
 			if ( privateDomain ) {
-				return this.getLabel( {
+				label = this.getLabel( {
 					status: 'is-success',
 					icon: 'lock',
 					href: privacyPath,
-					message: this.translate( 'On', {
+					message: translate( 'On', {
 						context: 'An icon label when Privacy Protection is enabled.'
 					} )
 				} );
+			} else {
+				label = this.getLabel( {
+					status: 'is-warning',
+					icon: 'notice',
+					href: transferPath,
+					message: translate( 'Disabled for Transfer', {
+						context: 'An icon label when Privacy Protection is temporarily disabled for transfer.'
+					} )
+				} );
 			}
-
-			return this.getLabel( {
+		} else {
+			label = this.getLabel( {
 				status: 'is-warning',
 				icon: 'notice',
-				href: transferPath,
-				message: this.translate( 'Disabled for Transfer', {
-					context: 'An icon label when Privacy Protection is temporarily disabled for transfer.'
+				href: privacyPath,
+				message: translate( 'None', {
+					context: 'An icon label when Privacy Protection is not purchased by the user.'
 				} )
 			} );
 		}
 
-		return this.getLabel( {
-			status: 'is-warning',
-			icon: 'notice',
-			href: privacyPath,
-			message: this.translate( 'None', {
-				context: 'An icon label when Privacy Protection is not purchased by the user.'
-			} )
-		} );
+		return (
+			<Property label={ translate( 'Privacy Protection' ) }>
+				{ label }
+			</Property>
+		);
 	},
 
 	handlePaymentSettingsClick() {
@@ -120,25 +131,21 @@ const RegisteredDomain = React.createClass( {
 	},
 
 	getVerticalNav() {
-		if ( this.props.domain.expired ) {
-			return null;
-		}
+		const { expirationMoment, expired, pendingTransfer } = this.props.domain;
+		const inNormalState = ! pendingTransfer && ! expired;
+		const inGracePeriod = this.moment().subtract( 18, 'days' ) <= expirationMoment;
 
 		return (
 			<VerticalNav>
-				{ this.emailNavItem() }
-				{ this.nameServersNavItem() }
-				{ this.contactsPrivacyNavItem() }
-				{ this.transferNavItem() }
+				{ inNormalState && this.emailNavItem() }
+				{ ( inNormalState || inGracePeriod ) && this.nameServersNavItem() }
+				{ ( inNormalState || inGracePeriod ) && this.contactsPrivacyNavItem() }
+				{ ( ! expired || inGracePeriod ) && this.transferNavItem() }
 			</VerticalNav>
 		);
 	},
 
 	emailNavItem() {
-		if ( this.props.domain.pendingTransfer ) {
-			return null;
-		}
-
 		const path = paths.domainManagementEmail(
 			this.props.selectedSite.slug,
 			this.props.domain.name
@@ -146,16 +153,12 @@ const RegisteredDomain = React.createClass( {
 
 		return (
 			<VerticalNavItem path={ path }>
-				{ this.translate( 'Email' ) }
+				{ this.props.translate( 'Email' ) }
 			</VerticalNavItem>
 		);
 	},
 
 	nameServersNavItem() {
-		if ( this.props.domain.pendingTransfer ) {
-			return null;
-		}
-
 		const path = paths.domainManagementNameServers(
 			this.props.selectedSite.slug,
 			this.props.domain.name
@@ -163,16 +166,12 @@ const RegisteredDomain = React.createClass( {
 
 		return (
 			<VerticalNavItem path={ path }>
-				{ this.translate( 'Name Servers and DNS' ) }
+				{ this.props.translate( 'Name Servers and DNS' ) }
 			</VerticalNavItem>
 		);
 	},
 
 	contactsPrivacyNavItem() {
-		if ( this.props.domain.pendingTransfer ) {
-			return null;
-		}
-
 		const path = paths.domainManagementContactsPrivacy(
 			this.props.selectedSite.slug,
 			this.props.domain.name
@@ -180,7 +179,7 @@ const RegisteredDomain = React.createClass( {
 
 		return (
 			<VerticalNavItem path={ path }>
-				{ this.translate( 'Contacts and Privacy' ) }
+				{ this.props.translate( 'Contacts and Privacy' ) }
 			</VerticalNavItem>
 		);
 	},
@@ -193,13 +192,13 @@ const RegisteredDomain = React.createClass( {
 
 		return (
 			<VerticalNavItem path={ path }>
-				{ this.translate( 'Transfer Domain' ) }
+				{ this.props.translate( 'Transfer Domain' ) }
 			</VerticalNavItem>
 		);
 	},
 
 	render() {
-		const domain = this.props.domain;
+		const { domain, translate } = this.props;
 
 		return (
 			<div>
@@ -208,19 +207,17 @@ const RegisteredDomain = React.createClass( {
 					<Header { ...this.props } />
 
 					<Card>
-						<Property label={ this.translate( 'Type', { context: 'A type of domain.' } ) }>
-							{ this.translate( 'Registered Domain' ) }
+						<Property label={ translate( 'Type', { context: 'A type of domain.' } ) }>
+							{ translate( 'Registered Domain' ) }
 						</Property>
 
-						<Property label={ this.translate( 'Registered on' ) }>
-							{ domain.registrationDate }
+						<Property label={ translate( 'Registered on' ) }>
+							{ domain.registrationMoment.format( 'LL' ) }
 						</Property>
 
 						{ this.getAutoRenewalOrExpirationDate() }
 
-						<Property label={ this.translate( 'Privacy Protection' ) }>
-							{ this.getPrivacyProtection() }
-						</Property>
+						{ this.getPrivacyProtection() }
 
 						<SubscriptionSettings
 							onClick={ this.handlePaymentSettingsClick } />
@@ -235,4 +232,4 @@ const RegisteredDomain = React.createClass( {
 	}
 } );
 
-export default RegisteredDomain;
+export default localize( RegisteredDomain );

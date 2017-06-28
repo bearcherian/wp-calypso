@@ -2,7 +2,7 @@
  * External dependencies
  */
 import debugFactory from 'debug';
-import { includes, keys, reduce, some } from 'lodash';
+import { includes, keys, reduce, some, map, every, isArray } from 'lodash';
 import store from 'store';
 import i18n from 'i18n-calypso';
 
@@ -11,27 +11,29 @@ import i18n from 'i18n-calypso';
  */
 import activeTests from 'lib/abtest/active-tests';
 import analytics from 'lib/analytics';
+import config from 'config';
 import userFactory from 'lib/user';
 import wpcom from 'lib/wp';
 
 const debug = debugFactory( 'calypso:abtests' );
 const user = userFactory();
 
-function ABTest( name ) {
+function ABTest( name, geoLocation ) {
 	if ( ! ( this instanceof ABTest ) ) {
-		return new ABTest( name );
+		return new ABTest( name, geoLocation );
 	}
 
-	this.init( name );
+	this.init( name, geoLocation );
 }
 
 /**
  * Returns a user's variation, setting it if he or she is not already a participant
  *
  * @param {String} name - The name of the A/B test
+ * @param {String} geoLocation - Location of current user
  * @returns {String} - The user's variation
  */
-export const abtest = ( name ) => new ABTest( name ).getVariationAndSetAsNeeded();
+export const abtest = ( name, geoLocation = false ) => new ABTest( name, geoLocation ).getVariationAndSetAsNeeded();
 
 /**
  * Returns a user's variation
@@ -62,7 +64,11 @@ const parseDateStamp = ( datestamp ) => {
 	return date;
 };
 
-ABTest.prototype.init = function( name ) {
+
+const languageSlugs = map( config( 'languages' ), 'langSlug' );
+const langSlugIsValid = ( slug ) => languageSlugs.indexOf( slug ) !== -1;
+
+ABTest.prototype.init = function( name, geoLocation ) {
 	if ( ! /^[A-Za-z\d]+$/.test( name ) ) {
 		throw new Error( 'The test name "' + name + '" should be camel case' );
 	}
@@ -87,6 +93,20 @@ ABTest.prototype.init = function( name ) {
 		throw new Error( 'A default variation is specified for ' + name + ' but it is not part of the variations' );
 	}
 
+	// Default: only run for 'en' locale.
+	this.localeTargets = [ 'en' ];
+	if ( testConfig.localeTargets ) {
+		if ( 'any' === testConfig.localeTargets ) {
+			// Allow any locales.
+			this.localeTargets = false;
+		} else if ( isArray( testConfig.localeTargets ) && every( testConfig.localeTargets, langSlugIsValid ) ) {
+			// Allow specific locales.
+			this.localeTargets = testConfig.localeTargets;
+		} else {
+			throw new Error( 'localeTargets can be either "any" or an array of one or more valid language slugs' );
+		}
+	}
+
 	const variationDatestamp = testConfig.datestamp;
 
 	this.name = name;
@@ -96,7 +116,16 @@ ABTest.prototype.init = function( name ) {
 	this.defaultVariation = testConfig.defaultVariation;
 	this.variationNames = variationNames;
 	this.experimentId = name + '_' + variationDatestamp;
-	this.allowAnyLocale = testConfig.allowAnyLocale === true;
+
+	if ( testConfig.countryCodeTarget ) {
+		if ( false !== geoLocation ) {
+			this.countryCodeTarget = testConfig.countryCodeTarget;
+			this.geoLocation = geoLocation;
+		} else {
+			throw new Error( 'Test config has geoTarget, but no geoLocation passed to abtest function' );
+		}
+	}
+
 	this.allowExistingUsers = testConfig.allowExistingUsers === true;
 };
 
@@ -133,30 +162,37 @@ ABTest.prototype.isEligibleForAbTest = function() {
 	const clientLanguage = client.language || client.userLanguage || 'en';
 	const clientLanguagesPrimary = ( client.languages && client.languages.length ) ? client.languages[ 0 ] : 'en';
 	const localeFromSession = i18n.getLocaleSlug() || 'en';
-	const englishMatcher = /^en-?/i;
 
 	if ( ! store.enabled ) {
 		debug( '%s: Local storage is not enabled', this.experimentId );
 		return false;
 	}
 
-	if ( ! this.allowAnyLocale ) {
-		if ( isUserSignedIn() && user.get().localeSlug !== 'en' ) {
-			debug( '%s: User has a non-English locale', this.experimentId );
+	if ( this.localeTargets ) {
+		const localeMatcher = new RegExp( '^(' + this.localeTargets.join( '|' ) + ')', 'i' );
+		const userLocale = user.get().localeSlug || 'en';
+
+		if ( isUserSignedIn() && ! userLocale.match( localeMatcher ) ) {
+			debug( '%s: User has a %s locale', this.experimentId, userLocale );
 			return false;
 		}
-		if ( ! isUserSignedIn() && ! clientLanguage.match( englishMatcher ) ) {
-			debug( '%s: Logged-out user has a non-English navigator.language preference', this.experimentId );
+		if ( ! isUserSignedIn() && ! clientLanguage.match( localeMatcher ) ) {
+			debug( '%s: Logged-out user has a %s navigator.language preference', this.experimentId, userLocale );
 			return false;
 		}
-		if ( ! isUserSignedIn() && ! clientLanguagesPrimary.match( englishMatcher ) ) {
-			debug( '%s: Logged-out user has a non-English navigator.languages primary preference', this.experimentId );
+		if ( ! isUserSignedIn() && ! clientLanguagesPrimary.match( localeMatcher ) ) {
+			debug( '%s: Logged-out user has a %s navigator.languages primary preference', this.experimentId, userLocale );
 			return false;
 		}
-		if ( ! isUserSignedIn() && ! localeFromSession.match( englishMatcher ) ) {
-			debug( '%s: Logged-out user has a non-English locale in session', this.experimentId );
+		if ( ! isUserSignedIn() && ! localeFromSession.match( localeMatcher ) ) {
+			debug( '%s: Logged-out user has the %s locale in session', this.experimentId, userLocale );
 			return false;
 		}
+	}
+
+	if ( this.countryCodeTarget && this.countryCodeTarget !== this.geoLocation ) {
+		debug( '%s: geoLocation is %s, test targets %s', this.experimentId, this.geoLocation, this.countryCodeTarget );
+		return false;
 	}
 
 	if ( this.hasBeenInPreviousSeriesTest() ) {

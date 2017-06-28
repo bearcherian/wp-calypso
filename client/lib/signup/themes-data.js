@@ -10,11 +10,11 @@ export const themes = [
 	},
 	{
 		name: 'Apostrophe',
-		slug: 'apostrophe',
+		slug: 'apostrophe-2',
 		repo: 'pub',
 		fallback: false,
 		design: 'grid',
-		demo_uri: 'https://apostrophedemo.wordpress.com',
+		demo_uri: 'https://apostrophe2demo.wordpress.com',
 		verticals: []
 	},
 	{
@@ -28,11 +28,11 @@ export const themes = [
 	},
 	{
 		name: 'Button',
-		slug: 'button',
+		slug: 'button-2',
 		repo: 'pub',
 		fallback: false,
 		design: 'blog',
-		demo_uri: 'https://buttondemo.wordpress.com',
+		demo_uri: 'https://button2demo.wordpress.com',
 		verticals: []
 	},
 	{
@@ -46,11 +46,11 @@ export const themes = [
 	},
 	{
 		name: 'Dyad',
-		slug: 'dyad',
+		slug: 'dyad-2',
 		repo: 'pub',
 		fallback: true,
 		design: 'grid',
-		demo_uri: 'https://dyaddemo.wordpress.com',
+		demo_uri: 'https://dyad2demo.wordpress.com',
 		verticals: []
 	},
 	{
@@ -127,11 +127,11 @@ export const themes = [
 	},
 	{
 		name: 'Independent Publisher',
-		slug: 'independent-publisher',
+		slug: 'independent-publisher-2',
 		repo: 'pub',
 		fallback: false,
 		design: '',
-		demo_uri: 'http://independentpublisherdemo.wordpress.com',
+		demo_uri: 'http://independentpublisher2demo.wordpress.com',
 		verticals: []
 	},
 	{

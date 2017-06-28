@@ -10,10 +10,20 @@
 	z-index: z-index( 'root', '.is-group-editor::before' );
 }
 
+.is-group-editor .sidebar {
+	left: auto;
+	right: -273px;
+}
+
 @include breakpoint( "<660px" ) {
 	.is-group-editor.focus-sidebar::before {
 		background-color: lighten( $gray, 30% );
 	}
+
+	.is-group-editor .sidebar {
+		right: auto;
+	}
+
 }
 
 .is-group-editor .layout__content {
@@ -24,12 +34,7 @@
 .post-editor__inner {
 	position: relative;
 	top: 47px;
-
-	@include breakpoint( "<660px" ) {
-		overflow-x: hidden;
-		margin-bottom: 47px;
-		border-bottom: 1px solid lighten( $gray, 20 );
-	}
+	padding-bottom: 47px;
 }
 
 .post-editor__content {
@@ -94,25 +99,23 @@
 	}
 }
 
-.editor__header,
-.editor .mce-container-body,
-.editor .tinymce {
-	max-width: 100%;
+.post-editor__header,
+.post-editor .mce-container-body,
+.post-editor .tinymce {
+	width: 100%;
+	max-width: 700px;
 	margin: 0 auto;
-
-	@include breakpoint( ">960px" ) {
-		width: 700px;
-	}
 }
 
-.focus-content .editor__header {
+.focus-content .post-editor__header {
 	@include breakpoint( ">660px" ) {
 		width: 700px;
 	}
 }
 
-.editor__header,
-.editor .mce-edit-area {
+.post-editor__header,
+.post-editor .mce-edit-area {
+	box-sizing: border-box;
 	padding: 0 16px;
 
 	@include breakpoint( ">1040px" ) {
@@ -125,17 +128,17 @@
 }
 
 // Component <Editor>
-.editor {
+.post-editor__content-editor {
 	position: relative;
 }
 
-.editor .editor-notice .notice {
+.post-editor__content-editor .editor-notice .notice {
 	@include breakpoint( ">660px" ) {
 		margin: 0;
 	}
 }
 
-.editor .tinymce {
+.post-editor .tinymce {
 	min-height: 100vh;
 	resize: none;
 	border-width: 0;
@@ -157,16 +160,16 @@
 	}
 }
 
-.editor__header {
+.post-editor__header {
 	position: relative;
 	padding-bottom: 27px;
 }
 
-.editor__switch-mode {
+.post-editor__switch-mode {
 	position: absolute;
 		right: 16px;
 	width: 160px;
-	z-index: z-index( 'root', '.editor__switch-mode' );
+	z-index: z-index( 'root', '.post-editor__switch-mode' );
 
 	@include breakpoint( ">960px" ) {
 		right: 32px;
@@ -177,7 +180,7 @@
 	}
 }
 
-.editor__switch-mode .segmented-control__item {
+.post-editor__switch-mode .segmented-control__item {
 	&:first-of-type {
 		.segmented-control__link {
 			border-bottom-left-radius: 0;
@@ -198,18 +201,18 @@
 	}
 }
 
-.editor__switch-mode .segmented-control__link {
+.post-editor__switch-mode .segmented-control__link {
 	background: $gray-light;
 	border-color: lighten( $gray, 20% );
 }
 
-.editor__switch-mode .segmented-control__item.is-selected .segmented-control__link {
+.post-editor__switch-mode .segmented-control__item.is-selected .segmented-control__link {
 	border-color: lighten( $gray, 20% );
 	border-bottom-color: $white;
 	background-color: $white;
 }
 
-.editor__header-divider {
+.post-editor__header-divider {
 	background-color: lighten( $gray, 25% );
 	max-width: 700px;
 	margin: 0 auto;
@@ -227,7 +230,7 @@
 	padding: 16px;
 }
 
-.editor .editor-featured-image {
+.post-editor__content-editor .editor-featured-image {
 	display: none;
 	border-bottom: 1px solid lighten( $gray, 20 );
 	border-top: 1px solid lighten( $gray, 20 );
@@ -248,56 +251,4 @@
 		margin: 0 auto;
 		max-height: 400px;
 	}
-}
-
-.post-editor__confirmation-dialog.is-narrow {
-	max-width: 100%;
-	border-radius: 0;
-
-	@include breakpoint( ">660px" ) {
-		max-width: 550px;
-		border-radius: 3px;
-	}
-}
-
-.post-editor__confirmation-dialog-heading {
-	font-size: 22px;
-	line-height: 1.2;
-	margin: 0 0 4px 0;
-}
-
-.post-editor__confirmation-dialog-heading.is-variable-height {
-	height: auto;
-}
-
-.post-editor__confirmation-dialog-email,
-.post-editor__confirmation-dialog-explanation,
-.post-editor__confirmation-dialog-reasoning {
-	color: darken( $gray, 30 );
-	margin: 0 0 8px 0;
-}
-
-.post-editor__confirmation-dialog-email {
-	margin-bottom: 16px;
-	color: darken( $gray, 10 );
-}
-
-.post-editor__confirmation-dialog-email-wrapper {
-	display: inline-block;
-	max-width: 70%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	margin-right: 5px;
-	vertical-align: bottom;
-}
-
-.post-editor__confirmation-dialog-reasoning {
-	color: darken( $gray, 10 );
-	font-size: 14px;
-	margin-bottom: 24px;
-}
-
-.post-editor__confirmation-dialog-spinner {
-	display: inline-block;
-	vertical-align: -25%;
 }

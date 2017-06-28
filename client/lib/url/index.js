@@ -2,13 +2,14 @@
  * External dependencies
  */
 import { parse as parseUrl } from 'url';
-import startsWith from 'lodash/startsWith';
+import { startsWith } from 'lodash';
 
 /**
  * Internal dependencies
  */
 import config from 'config';
 import addQueryArgs from 'lib/route/add-query-args';
+import { isLegacyRoute } from 'lib/route/legacy-routes';
 
 /**
  * Check if a URL is located outside of Calypso.
@@ -24,14 +25,30 @@ function isOutsideCalypso( url ) {
 }
 
 function isExternal( url ) {
-	const { hostname } = parseUrl( url, false, true ); // no qs needed, and slashesDenoteHost to handle protocol-relative URLs
+	// parseURL will return hostname = null if no protocol or double-slashes
+	// the url passed in might be of form `en.support.wordpress.com`
+	// so for this function we'll append double-slashes to fake it
+	// if it is a relative URL the hostname will still be empty from parseURL
+	if ( ! startsWith( url, 'http://' ) && ! startsWith( url, 'https://' ) && ! startsWith( url, '//' ) ) {
+		url = '//' + url;
+	}
+
+	const { hostname, path } = parseUrl( url, false, true ); // no qs needed, and slashesDenoteHost to handle protocol-relative URLs
 
 	if ( ! hostname ) {
 		return false;
 	}
 
 	if ( typeof window !== 'undefined' ) {
-		return hostname !== window.location.hostname;
+		if ( hostname === window.location.hostname ) {
+			// even if hostname matches, the url might be outside calypso
+			// outside calypso should be considered external
+			// double separators are valid paths - but not handled correctly
+			if ( path && isLegacyRoute( path.replace( '//', '/' ) ) ) {
+				return true;
+			}
+			return false;
+		}
 	}
 
 	return hostname !== config( 'hostname' );
@@ -90,6 +107,53 @@ function urlToSlug( url ) {
 	return withoutHttp( url ).replace( /\//g, '::' );
 }
 
+/**
+ * Removes the `http(s)://` part and the trailing slash from an URL.
+ * "http://blog.wordpress.com" will be converted into "blog.wordpress.com".
+ * "https://www.wordpress.com/blog/" will be converted into "www.wordpress.com/blog".
+ *
+ * @param  {String} urlToConvert The URL to convert
+ * @return {String} The URL's domain and path
+ */
+function urlToDomainAndPath( urlToConvert ) {
+	return withoutHttp( urlToConvert ).replace( /\/$/, '' );
+}
+
+/**
+ * Checks if the supplied string appears to be a URL.
+ * Looks only for the absolute basics:
+ *  - does it have a .suffix?
+ *  - does it have at least two parts separated by a dot?
+ *
+ * @param  {String}  query The string to check
+ * @return {Boolean} Does it appear to be a URL?
+ */
+function resemblesUrl( query ) {
+	let parsedUrl = parseUrl( query );
+
+	// Make sure the query has a protocol - hostname ends up blank otherwise
+	if ( ! parsedUrl.protocol ) {
+		parsedUrl = parseUrl( 'http://' + query );
+	}
+
+	if ( ! parsedUrl.hostname || parsedUrl.hostname.indexOf( '.' ) === -1 ) {
+		return false;
+	}
+
+	// Check for a valid-looking TLD
+	if ( parsedUrl.hostname.lastIndexOf( '.' ) > ( parsedUrl.hostname.length - 3 ) ) {
+		return false;
+	}
+
+	// Make sure the hostname has at least two parts separated by a dot
+	const hostnameParts = parsedUrl.hostname.split( '.' ).filter( Boolean );
+	if ( hostnameParts.length < 2 ) {
+		return false;
+	}
+
+	return true;
+}
+
 export default {
 	isOutsideCalypso,
 	isExternal,
@@ -98,6 +162,8 @@ export default {
 	addSchemeIfMissing,
 	setUrlScheme,
 	urlToSlug,
+	urlToDomainAndPath,
 	// [TODO]: Move lib/route/add-query-args contents here
-	addQueryArgs
+	addQueryArgs,
+	resemblesUrl,
 };

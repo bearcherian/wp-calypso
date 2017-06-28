@@ -1,94 +1,97 @@
 /**
  * External dependencies
  */
-import React from 'react';
+import React, { Component, PropTypes } from 'react';
 import page from 'page';
+import { localize } from 'i18n-calypso';
 
 /**
  * Internal dependencies
  */
 import MediaLibrary from 'my-sites/media-library';
 import SidebarNavigation from 'my-sites/sidebar-navigation';
-import observe from 'lib/mixins/data-observe';
 import Dialog from 'components/dialog';
 import { EditorMediaModalDetail } from 'post-editor/media-modal/detail';
 import ImageEditor from 'blocks/image-editor';
+import VideoEditor from 'blocks/video-editor';
 import MediaActions from 'lib/media/actions';
 import MediaUtils from 'lib/media/utils';
 import MediaLibrarySelectedData from 'components/data/media-library-selected-data';
 import MediaLibrarySelectedStore from 'lib/media/library-selected-store';
 import accept from 'lib/accept';
 
-export default React.createClass( {
-	displayName: 'Media',
+class Media extends Component {
 
-	mixins: [ observe( 'sites' ) ],
+	static propTypes = {
+		selectedSite: PropTypes.object,
+		filter: PropTypes.string,
+		search: PropTypes.string
+	};
 
-	propTypes: {
-		sites: React.PropTypes.object
-	},
+	state = {
+		currentDetail: null,
+		editedImageItem: null,
+		editedVideoItem: null,
+		selectedItems: [],
+	};
 
-	getInitialState: function() {
-		return {
-			editedItem: null,
-			currentDetail: null,
-			selectedImages: [],
-		};
-	},
-
-	componentDidMount: function() {
+	componentDidMount() {
 		this.setState( {
 			containerWidth: this.refs.container.clientWidth
 		} );
-	},
+	}
 
-	onFilterChange: function( filter ) {
+	onFilterChange = ( filter ) => {
 		let redirect = '/media';
 
 		if ( filter ) {
 			redirect += '/' + filter;
 		}
 
-		if ( this.props.sites.selected ) {
-			redirect += '/' + this.props.sites.selected;
+		if ( this.props.selectedSite ) {
+			redirect += '/' + this.props.selectedSite.slug;
 		}
 
 		page( redirect );
-	},
+	};
 
-	openDetailsModalForASingleImage( image ) {
+	openDetailsModalForASingleImage = ( image ) => {
 		this.setState( {
 			currentDetail: 0,
-			selectedImages: [ image ],
+			selectedItems: [ image ],
 		} );
-	},
+	};
 
-	openDetailsModalForAllSelected() {
-		const site = this.props.sites.getSelectedSite();
+	openDetailsModalForAllSelected = () => {
+		const site = this.props.selectedSite;
 		const selected = MediaLibrarySelectedStore.getAll( site.ID );
 
 		this.setState( {
 			currentDetail: 0,
-			selectedImages: selected
+			selectedItems: selected
 		} );
-	},
+	};
 
-	closeDetailsModal() {
-		this.setState( { editedItem: null, currentDetail: null, selectedImages: [] } );
-	},
+	closeDetailsModal = () => {
+		this.setState( { editedImageItem: null, editedVideoItem: null, currentDetail: null, selectedItems: [] } );
+	};
 
-	editImage() {
-		this.setState( { currentDetail: null, editedItem: this.state.currentDetail } );
-	},
+	editImage = () => {
+		this.setState( { currentDetail: null, editedImageItem: this.state.currentDetail } );
+	};
 
-	onImageEditorCancel: function( imageEditorProps ) {
+	editVideo = () => {
+		this.setState( { currentDetail: null, editedVideoItem: this.state.currentDetail } );
+	};
+
+	onImageEditorCancel = ( imageEditorProps ) => {
 		const {	resetAllImageEditorState } = imageEditorProps;
-		this.setState( { currentDetail: this.state.editedItem, editedItem: null } );
+		this.setState( { currentDetail: this.state.editedImageItem, editedImageItem: null } );
 
 		resetAllImageEditorState();
-	},
+	};
 
-	onImageEditorDone( error, blob, imageEditorProps ) {
+	onImageEditorDone = ( error, blob, imageEditorProps ) => {
 		if ( error ) {
 			this.onEditImageCancel( imageEditorProps );
 
@@ -115,45 +118,71 @@ export default React.createClass( {
 
 		MediaActions.update( site.ID, item, true );
 		resetAllImageEditorState();
-		this.setState( { currentDetail: null, editedItem: null, selectedImages: [] } );
-	},
+		this.setState( { currentDetail: null, editedImageItem: null, selectedItems: [] } );
+	};
 
 	getModalButtons() {
-		// do not render buttons if the media image editor is opened
-		if ( this.state.editedItem !== null ) {
+		// do not render buttons if the media image or video editor is opened
+		if ( ( this.state.editedImageItem !== null ) || ( this.state.editedVideoItem !== null ) ) {
 			return null;
 		}
+
+		const { translate } = this.props;
 
 		return [
 			{
 				action: 'delete',
 				additionalClassNames: 'media__modal-delete-item-button is-link',
-				label: this.translate( 'Delete' ),
+				label: translate( 'Delete' ),
 				isPrimary: false,
 				disabled: false,
 				onClick: this.deleteMediaByItemDetail,
 			},
 			{
 				action: 'confirm',
-				label: this.translate( 'Done' ),
+				label: translate( 'Done' ),
 				isPrimary: true,
 				disabled: false,
 				onClose: this.closeDetailsModal,
 			}
 		];
-	},
+	}
 
-	restoreOriginalMedia: function( siteId, item ) {
+	onVideoEditorCancel = () => {
+		this.setState( { currentDetail: this.state.editedVideoItem, editedVideoItem: null } );
+	};
+
+	onVideoEditorUpdatePoster = ( { ID, posterUrl } ) => {
+		const site = this.props.selectedSite;
+
+		// Photon does not support URLs with a querystring component.
+		const urlBeforeQuery = ( posterUrl || '' ).split( '?' )[ 0 ];
+
+		if ( site ) {
+			MediaActions.edit( site.ID, {
+				ID,
+				thumbnails: {
+					fmt_hd: urlBeforeQuery,
+					fmt_dvd: urlBeforeQuery,
+					fmt_std: urlBeforeQuery,
+				}
+			} );
+		}
+
+		this.setState( { currentDetail: null, editedVideoItem: null, selectedItems: [] } );
+	};
+
+	restoreOriginalMedia = ( siteId, item ) => {
 		if ( ! siteId || ! item ) {
 			return;
 		}
 		MediaActions.update( siteId, { ID: item.ID, media_url: item.guid }, true );
-		this.setState( { currentDetail: null, editedItem: null, selectedImages: [] } );
-	},
+		this.setState( { currentDetail: null, editedImageItem: null, selectedItems: [] } );
+	};
 
-	setDetailSelectedIndex: function( index ) {
+	setDetailSelectedIndex = ( index ) => {
 		this.setState( { currentDetail: index } );
-	},
+	};
 
 	/**
 	 * Start the process to delete media items.
@@ -162,11 +191,11 @@ export default React.createClass( {
 	 *
 	 * @param  {Function} [callback] - callback function
 	 */
-	deleteMedia: function( callback ) {
-		const site = this.props.sites.getSelectedSite();
+	deleteMedia( callback ) {
+		const site = this.props.selectedSite;
 		const selected = MediaLibrarySelectedStore.getAll( site.ID );
 		const selectedCount = selected.length;
-		const confirmMessage = this.translate(
+		const confirmMessage = this.props.translate(
 			'Are you sure you want to permanently delete this item?',
 			'Are you sure you want to permanently delete these items?',
 			{ count: selectedCount }
@@ -182,36 +211,36 @@ export default React.createClass( {
 				callback();
 			}
 		} );
-	},
+	}
 
-	handleDeleteMediaEvent() {
+	handleDeleteMediaEvent = () => {
 		this.deleteMedia();
-	},
+	};
 
-	deleteMediaByItemDetail() {
+	deleteMediaByItemDetail = () => {
 		this.deleteMedia( () => this.closeDetailsModal() );
-	},
+	};
 
-	confirmDeleteMedia: function() {
-		const site = this.props.sites.getSelectedSite();
+	confirmDeleteMedia = () => {
+		const site = this.props.selectedSite;
 
 		if ( ! site ) {
 			return;
 		}
 
-		const selected = this.state.selectedImages && this.state.selectedImages.length
-			? this.state.selectedImages
+		const selected = this.state.selectedItems && this.state.selectedItems.length
+			? this.state.selectedItems
 			: MediaLibrarySelectedStore.getAll( site.ID );
 
 		MediaActions.delete( site.ID, selected );
-	},
+	};
 
-	render: function() {
-		const site = this.props.sites.getSelectedSite();
+	render() {
+		const site = this.props.selectedSite;
 		return (
 			<div ref="container" className="main main-column media" role="main">
 				<SidebarNavigation />
-				{ ( this.state.editedItem !== null || this.state.currentDetail !== null ) &&
+				{ ( this.state.editedImageItem !== null || this.state.editedVideoItem !== null || this.state.currentDetail !== null ) &&
 					<Dialog
 						isVisible={ true }
 						additionalClassNames="editor-media-modal media__item-dialog"
@@ -221,20 +250,28 @@ export default React.createClass( {
 					{ this.state.currentDetail !== null &&
 						<EditorMediaModalDetail
 							site={ site }
-							items={ this.state.selectedImages }
+							items={ this.state.selectedItems }
 							selectedIndex={ this.state.currentDetail }
 							onReturnToList={ this.closeDetailsModal }
-							onEditItem={ this.editImage }
+							onEditImageItem={ this.editImage }
+							onEditVideoItem={ this.editVideo }
 							onRestoreItem={ this.restoreOriginalMedia }
 							onSelectedIndexChange={ this.setDetailSelectedIndex }
 						/>
 					}
-					{ this.state.editedItem !== null &&
+					{ this.state.editedImageItem !== null &&
 						<ImageEditor
 							siteId={ site && site.ID }
-							media={ this.state.selectedImages[ this.state.editedItem ] }
+							media={ this.state.selectedItems[ this.state.editedImageItem ] }
 							onDone={ this.onImageEditorDone }
 							onCancel={ this.onImageEditorCancel }
+						/>
+					}
+					{ this.state.editedVideoItem !== null &&
+						<VideoEditor
+							media={ this.state.selectedItems[ this.state.editedVideoItem ] }
+							onCancel={ this.onVideoEditorCancel }
+							onUpdatePoster={ this.onVideoEditorUpdatePoster }
 						/>
 					}
 					</Dialog>
@@ -258,4 +295,6 @@ export default React.createClass( {
 			</div>
 		);
 	}
-} );
+}
+
+export default localize( Media );

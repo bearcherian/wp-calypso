@@ -2,7 +2,9 @@
  * External dependencies
  */
 import React from 'react';
+import { connect } from 'react-redux';
 import page from 'page';
+import i18n from 'i18n-calypso';
 
 /**
  * Internal dependencies
@@ -12,11 +14,14 @@ import Main from 'components/main';
 import observe from 'lib/mixins/data-observe';
 import SiteSelector from 'components/site-selector';
 import { addSiteFragment } from 'lib/route';
+import { getSites } from 'state/selectors';
+import { getSiteSlug } from 'state/sites/selectors';
+import { getSelectedSite } from 'state/ui/selectors';
 
-export default React.createClass( {
+export const Sites = React.createClass( {
 	displayName: 'Sites',
 
-	mixins: [ observe( 'sites', 'user' ) ],
+	mixins: [ observe( 'user' ) ],
 
 	propTypes: {
 		path: React.PropTypes.string.isRequired
@@ -26,8 +31,8 @@ export default React.createClass( {
 		let path = this.props.path;
 
 		// Override the path to be /sites so that when a site is
-		// selected the filterbar is operates as if we're on /sites
-		if ( this.props.sites.selected ) {
+		// selected the filterbar operates as if we're on /sites
+		if ( this.props.selectedSite ) {
 			path = '/sites';
 		}
 
@@ -38,24 +43,21 @@ export default React.createClass( {
 		}
 
 		// Filter out jetpack sites when on particular routes
-		if ( /^\/menus/.test( path ) || /^\/customize/.test( path ) ) {
+		if ( /^\/customize/.test( path ) ) {
 			return ! site.jetpack;
 		}
 
 		// Filter out sites with no upgrades on particular routes
 		if ( /^\/domains/.test( path ) || /^\/plans/.test( this.props.sourcePath ) ) {
-			return site.isUpgradeable();
+			return ! site.isJetpack || site.isSiteUpgradable;
 		}
 
 		return site;
 	},
 
-	onSiteSelect: function( slug ) {
-		let path = this.props.path;
-		if ( path === '/sites' ) {
-			path = '/stats/insights';
-		}
-		page( addSiteFragment( path, slug ) );
+	onSiteSelect: function( siteId ) {
+		this.props.selectSite( siteId, this.props.path );
+		return true;
 	},
 
 	getHeaderText() {
@@ -63,9 +65,36 @@ export default React.createClass( {
 			return this.props.getSiteSelectionHeaderText();
 		}
 
-		const path = this.props.path.split( '?' )[ 0 ].replace( /\//g, ' ' );
+		let path = this.props.path.split( '?' )[ 0 ].split( '/' )[ 1 ];
+		if ( typeof path !== 'undefined' ) {
+			path = path.toLowerCase();
+		}
 
-		return this.translate( 'Please select a site to open {{strong}}%(path)s{{/strong}}', {
+		switch ( path ) {
+			case 'stats':
+				path = i18n.translate( 'Insights' );
+				break;
+			case 'plans':
+				path = i18n.translate( 'Plans' );
+				break;
+			case 'media':
+				path = i18n.translate( 'Media' );
+				break;
+			case 'sharing':
+				path = i18n.translate( 'Sharing' );
+				break;
+			case 'people':
+				path = i18n.translate( 'People' );
+				break;
+			case 'domains':
+				path = i18n.translate( 'Domains' );
+				break;
+			case 'settings':
+				path = i18n.translate( 'Settings' );
+				break;
+		}
+
+		return i18n.translate( 'Please select a site to open {{strong}}%(path)s{{/strong}}', {
 			args: {
 				path: path
 			},
@@ -84,7 +113,7 @@ export default React.createClass( {
 				<Card className="sites__selector-wrapper">
 					<SiteSelector
 						autoFocus={ true }
-						filter={ ( site ) => this.filterSites( site ) }
+						filter={ this.filterSites }
 						onSiteSelect={ this.onSiteSelect }
 						sites={ this.props.sites }
 						groups={ true }
@@ -94,3 +123,20 @@ export default React.createClass( {
 		);
 	}
 } );
+
+const selectSite = ( siteId, rawPath ) => ( dispatch, getState ) => {
+	const path = ( rawPath === '/sites' )
+		? '/stats/insights'
+		: rawPath;
+	page( addSiteFragment( path, getSiteSlug( getState(), siteId ) ) );
+};
+
+export default connect(
+	( state ) => {
+		return {
+			selectedSite: getSelectedSite( state ),
+			sites: getSites( state ),
+		};
+	},
+	{ selectSite }
+)( Sites );

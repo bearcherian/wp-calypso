@@ -32,9 +32,9 @@ describe( 'assembler', () => {
 			wpcom_domain: true
 		} ),
 		redirectDomainObject = {
-			autoRenewalDate: undefined,
+			autoRenewalMoment: undefined,
 			currentUserCanManage: undefined,
-			expirationMoment: null,
+			expirationMoment: undefined,
 			expired: undefined,
 			expirySoon: undefined,
 			googleAppsSubscription: undefined,
@@ -46,9 +46,9 @@ describe( 'assembler', () => {
 			manualTransferRequired: undefined,
 			owner: undefined,
 			privateDomain: undefined,
+			privacyAvailable: undefined,
 			pendingTransfer: undefined,
 			registrar: undefined,
-			registrationDate: undefined,
 			registrationMoment: undefined,
 			type: domainTypes.SITE_REDIRECT,
 			hasZone: undefined,

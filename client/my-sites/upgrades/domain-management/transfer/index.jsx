@@ -1,23 +1,25 @@
 /**
  * External Dependencies
  */
+import { connect } from 'react-redux';
 import React from 'react';
 
 /**
  * Internal Dependencies
  */
+import { get } from 'lodash';
+import { getSelectedSiteId } from 'state/ui/selectors';
+import Header from 'my-sites/upgrades/domain-management/components/header';
+import { isDomainOnlySite, isSiteAutomatedTransfer } from 'state/selectors';
 import { localize } from 'i18n-calypso';
+import Main from 'components/main';
 import paths from 'my-sites/upgrades/paths';
 import VerticalNav from 'components/vertical-nav';
 import VerticalNavItem from 'components/vertical-nav/item';
-import Header from 'my-sites/upgrades/domain-management/components/header';
-import Main from 'components/main';
-import { get } from 'lodash';
 
 function Transfer( props ) {
-	const { selectedSite, selectedDomainName, translate } = props;
+	const { isAutomatedTransfer, isDomainOnly, selectedSite, selectedDomainName, translate } = props;
 	const slug = get( selectedSite, 'slug' );
-	const canTransferDomain = ! get( selectedSite, 'options.is_automated_transfer', false );
 
 	return (
 		<Main className="domain-management-transfer">
@@ -27,18 +29,28 @@ function Transfer( props ) {
 				{ translate( 'Transfer Domain' ) }
 			</Header>
 			<VerticalNav>
-				<VerticalNavItem path={
-					paths.domainManagementTransferOut( slug, selectedDomainName )
-				}>
+				<VerticalNavItem path={ paths.domainManagementTransferOut( slug, selectedDomainName ) }>
 					{ translate( 'Transfer to another registrar' ) }
 				</VerticalNavItem>
-					{ canTransferDomain &&
-						<VerticalNavItem path={ paths.domainManagementTransferToAnotherUser( slug, selectedDomainName ) }>
-							{ translate( 'Transfer to another user' ) }
-						</VerticalNavItem> }
+				{ ! isAutomatedTransfer && ! isDomainOnly &&
+					<VerticalNavItem path={ paths.domainManagementTransferToAnotherUser( slug, selectedDomainName ) }>
+						{ translate( 'Transfer to another user' ) }
+					</VerticalNavItem>
+				}
+				{ ! isAutomatedTransfer &&
+					<VerticalNavItem path={ paths.domainManagementTransferToOtherSite( slug, selectedDomainName ) }>
+						{ translate( 'Transfer to another WordPress.com site' ) }
+					</VerticalNavItem>
+				}
 			</VerticalNav>
 		</Main>
 	);
 }
 
-export default localize( Transfer );
+export default connect( ( state ) => {
+	const siteId = getSelectedSiteId( state );
+	return {
+		isAutomatedTransfer: isSiteAutomatedTransfer( state, siteId ),
+		isDomainOnly: isDomainOnlySite( state, siteId )
+	};
+} )( localize( Transfer ) );
